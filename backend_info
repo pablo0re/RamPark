@@ -1,0 +1,65 @@
+main.py
+Starts the FastAPI app
+Enables CORS
+Connects routers:
+/parking
+/admin
+/recommend
+/detect
+Has a health route / to confirm server is live
+
+firebase_config.py
+Initializes Firebase Admin SDK
+Creates Firestore client (db)
+Creates Storage bucket handle (bucket)
+Requires local file: serviceAccountKey.json (each teammate must download their own)
+
+auth.py
+Verifies Firebase ID token from frontend (Bearer <token>)
+Enforces domain restriction: @farmingdale.edu
+verify_admin() checks Firestore user doc role field, blocks non-admins
+
+models.py
+Pydantic models (data shapes) for:
+ParkingLot
+ParkingSpot
+RecommendationRequest
+Keeps API payloads consistent
+
+requirements.txt
+Python dependencies for backend
+Everyone runs:
+pip install -r requirements.txt
+
+routers/parking.py
+GET /parking/lots → returns all lots for Google Maps markers
+Adds occupancy color logic:
+0–25 green
+26–50 yellow
+51–75 orange
+76–100 red
+GET /parking/lots/{lot_id}/spots → returns spot list (only meaningful for lot15 and lot15A)
+
+routers/detection.py
+POST /detect/upload/{lot_id} → upload a photo
+Saves photo to Firebase Storage
+Simulates “AI detection” by randomly setting spot statuses
+Updates Firestore spot docs
+
+routers/recommendations.py
+POST /recommend/suggest → returns a recommended lot
+Right now it’s partially mocked (building coords hardcoded)
+Needs next work: real building coordinates + distance matrix
+
+routers/admin.py
+Admin-only endpoints (protected by verify_admin)
+Update lot capacity
+Override lot occupancy
+This is where admin dashboard actions connect later
+
+gitignore
+Prevents pushing:
+serviceAccountKey.json
+venv/
+
+.env
