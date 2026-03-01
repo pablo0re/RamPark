@@ -1,51 +1,48 @@
-"use client";
-//import {createContext,useContext, useEffect, useState, ReactNode } from 'react';
-//import {onAuthStateChanged,User, signInWithEmailAndPassword, signout } from 'firebase/auth';
-//import { auth } from '@/lib/firebase';
+//Might Need This
 
-//interface AuthContextType {
- //  user: User | null;
-  //  isFSCUser: boolean;
-  //  loading: boolean;
-  //  login: (email: string, password: string) => Promise<void>;
-  //  logout: () => Promise<void>;
-//}
+// "use client";
+// import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+// import { User, onAuthStateChanged } from 'firebase/auth';
+// import { auth } from '@/lib/firebase';
 
-//const AuthContext = createContext<AuthContextType | undefined> (undefined);
+// interface AuthContextType {
+//   user: User | null;
+//   loading: boolean;
+// }
 
-//export function AuthProvider({ children }: { children: ReactNode}){
- //   const [user, setUser] = useState<User | null>(null);
- //   const [isFSCUser, setIsFSCUser] = useState(true);
- //   const [loading,setLoading] = useState(true);
+// const AuthContext = createContext<AuthContextType | null>(null);
 
-//    useEffect(() => {
- //       const unsubscribe = onAuthStateChanged(auth, (user) => {
- //           setUser(user);
- //           if (user?.email) {
- //               setIsFSCUser(user.email.endsWith('@farmingdale.edu'));
- //           }
- //           setLoading(false);
- //       });
- //       return unsubscribe;
-//    }, []);
+// export function AuthProvider({ children }: { children: ReactNode }) {
+//   const [user, setUser] = useState<User | null>(null);
+//   const [loading, setLoading] = useState(true);
 
- //   const login = async (email: string, password: string) => {
- //       await signInWithEmailAndPassword(auth, email, password);
- //   };
+//   useEffect(() => {
+//     const unsubscribe = onAuthStateChanged(auth, (user) => {
+//       setUser(user);
+//       setLoading(false);
+//     });
+//     return () => unsubscribe();
+//   }, []);
 
- //   const logout = async () => {
-//        await signout(auth);
- //   };
+//   const value = { user, loading };
 
- //   return (
- //       <AuthContext.Provider value={{ user, isFSCUser,loading, login, logout}}>
- //           {children}
- //       </AuthContext.Provider>
-//    );
-//}
+//   if (loading) {
+//     return (
+//       <div className="flex items-center justify-center min-h-screen bg-gray-50">
+//         <div className="text-xl">Loading...</div>
+//       </div>
+//     );
+//   }
 
-//export const useAuth = () => {
-//    const context = useContext(AuthContext);
-//    if (!context) throw new Error('useAuth must be used within AuthProvider');
-//    return context;
-//};
+//   return (
+//     <AuthContext.Provider value={value}>
+//       {children}
+//     </AuthContext.Provider>
+//   );
+// }
+
+// export const useAuth = () => {
+//   const context = useContext(AuthContext);
+//   if (!context) throw new Error('useAuth must be used within AuthProvider');
+//   return context;
+// };
