@@ -1,6 +1,8 @@
 'use client';
+
 import Link from 'next/link';
-import { Menu, User } from 'lucide-react';
+import { Menu } from 'lucide-react';
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 
 const NavbarComponent = () => {
   return (
@@ -14,26 +16,54 @@ const NavbarComponent = () => {
             Ram Park
           </span>
         </Link>
-        
+
         <div className="hidden md:flex items-center space-x-4">
-          <Link href="/status" className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors">
+          <Link
+            href="/status"
+            className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors"
+          >
             Status
           </Link>
-          <Link href="/ai" className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors">
+          <Link
+            href="/ai"
+            className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors"
+          >
             AI Simulation
           </Link>
-          <Link href="/recommend" className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors">
+          <Link
+            href="/recommend"
+            className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors"
+          >
             Recommendations
           </Link>
-          <Link href="/admin" className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors">
+          <Link
+            href="/admin"
+            className="text-slate-300 hover:text-white px-3 py-2 rounded-lg transition-colors"
+          >
             Admin
           </Link>
         </div>
-        
+
         <div className="flex items-center space-x-2 md:space-x-4">
-          <button className="p-2 text-slate-400 hover:text-white rounded-lg">
-            <User size={20} />
-          </button>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white font-medium hover:opacity-90 transition">
+                Sign In
+              </button>
+            </SignInButton>
+          </SignedOut>
+
+          <SignedIn>
+            <UserButton
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: 'w-9 h-9',
+                },
+              }}
+            />
+          </SignedIn>
+
           <button className="md:hidden p-2 text-slate-400 hover:text-white">
             <Menu size={20} />
           </button>
@@ -41,5 +71,6 @@ const NavbarComponent = () => {
       </div>
     </nav>
   );
-}
+};
+
 export default NavbarComponent;
