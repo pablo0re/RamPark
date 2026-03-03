@@ -18,7 +18,7 @@ export default function AIPage() {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-12 items-start">
-        <PhotoUpload />
+        <PhotoUpload lotId="lot15" />
         
         <div className="space-y-6">
           <Card>
