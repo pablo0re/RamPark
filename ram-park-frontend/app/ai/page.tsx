@@ -46,7 +46,7 @@ export default function AIPage() {
           <Card>
             <h3 className="text-xl font-bold mb-4">How It Works</h3>
             <ol className="space-y-2 text-slate-400 text-sm">
-              <li>📸 Upload photo → Saved to Firebase Storage</li>
+              <li>📸 Upload photo </li>
               <li>🧠 AI simulates spot detection (random toggle)</li>
               <li>📊 Updates photoOccupancy% in real-time</li>
               <li>⚡ Triggers prediction recalculation</li>
