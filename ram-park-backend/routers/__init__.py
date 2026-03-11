@@ -1,1 +1,1 @@
-from . import parking, admin, recommendations, detection
+from . import parking, admin, recommendations, detection, prediction, users, feedback

@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import parking, admin, recommendations, detection, prediction
-
+from routers import parking, admin, recommendations, detection, prediction, users, feedback
 app = FastAPI(title="Ram Park API")
 
 app.add_middleware(
@@ -16,6 +15,8 @@ app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 app.include_router(recommendations.router, prefix="/recommend", tags=["Recommendation"])
 app.include_router(detection.router, prefix="/detect", tags=["AI Simulation"])
 app.include_router(prediction.router, prefix="/predict", tags=["Prediction"])
+app.include_router(users.router, prefix="/user", tags=["User"])
+app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
 
 @app.get("/")
 def home():

@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from models import RecommendationRequest
 import math
 
 router = APIRouter()
