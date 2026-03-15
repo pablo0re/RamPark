@@ -79,8 +79,6 @@ const NavbarComponent = () => {
               </Button>
             </Link>
           )}
-
-          {/* Mobile menu button */}
           <button className="md:hidden p-2 text-slate-400 hover:text-white rounded-lg">
             <Menu size={20} />
           </button>

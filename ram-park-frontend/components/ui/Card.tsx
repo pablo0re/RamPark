@@ -1,19 +1,37 @@
 import { cn } from '@/lib/utils';
 
-interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
-  children: React.ReactNode;
-}
-
-export function Card({ className, children, ...props }: CardProps) {
+export function Card({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 shadow-2xl hover:shadow-3xl transition-all duration-300',
+        'rounded-2xl border border-gray-200 bg-white shadow-lg hover:shadow-xl transition-all duration-300',
         className
       )}
       {...props}
-    >
-      {children}
-    </div>
+    />
   );
+}
+
+export function CardHeader({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('p-6 pb-3', className)} {...props} />;
+}
+
+export function CardTitle({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return <h3 className={cn('text-2xl font-bold', className)} {...props} />;
+}
+
+export function CardContent({ 
+  className, 
+  ...props 
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('p-6 pt-0', className)} {...props} />;
 }

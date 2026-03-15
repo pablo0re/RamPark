@@ -1,320 +1,467 @@
-// import Link from 'next/link';
-// import { Button } from '@/components/ui/Button';
-// import { Card } from '@/components/ui/Card';
-// import { ArrowRight, Users, Camera, Clock, Shield } from 'lucide-react';
+"use client";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap } from "lucide-react";
 
-// export default function HomePage() {
-//   return (
-//     <>
-//       <section className="relative overflow-hidden pt-32 pb-24">
-//         <div className="absolute inset-0 bg-grid-pattern opacity-20" />
-//         <div className="max-w-7xl mx-auto px-6 text-center relative z-10">
-//           <h1 className="text-6xl md:text-7xl font-black bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent mb-6">
-//             Smart Parking
-//             <span className="block bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-//               System
-//             </span>
-//           </h1>
-//           <p className="text-xl md:text-2xl text-slate-300 mb-8 max-w-2xl mx-auto leading-relaxed">
-//             Park smarter with real-time occupancy, AI photo simulation, and schedule-based recommendations.
-//           </p>
-//           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-//             <Link href="/status">
-//               <Button size="lg" className="group">
-//                 Get Started
-//                 <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-//               </Button>
-//             </Link>
-//             <Link href="/ai">
-//               <Button variant="secondary" size="lg">
-//                 Try AI Demo
-//               </Button>
-//             </Link>
-//           </div>
-//         </div>
-//       </section>
+const C = {
+  bg:          "#0d2818",
+  bgCard:      "#142a1e",
+  bgPanel:     "#1a3d28",
+  border:      "#2a5438",
+  borderHover: "#3a7a50",
+  green:       "#3a8a52",
+  greenBright: "#4caf6e",
+  gold:        "#c9a227",
+  goldLight:   "#e0b83a",
+  text:        "#eef4f0",
+  muted:       "#7a9e88",
+  dimmed:      "#4a6e58",
+} as const;
 
-//       {/* Features */}
-//       <section className="max-w-7xl mx-auto px-6 py-24">
-//         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-//           <Card className="text-center group hover:scale-105 transition-all duration-300">
-//             <Users className="w-12 h-12 text-blue-400 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-//             <h3 className="text-xl font-bold mb-2">Real-Time Status</h3>
-//             <p className="text-slate-400">Live occupancy updates across all campus lots.</p>
-//           </Card>
-          
-//           <Card className="text-center group hover:scale-105 transition-all duration-300">
-//             <Camera className="w-12 h-12 text-purple-400 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-//             <h3 className="text-xl font-bold mb-2">AI Photo Simulation</h3>
-//             <p className="text-slate-400">Visual spot detection using computer vision.</p>
-//           </Card>
-          
-//           <Card className="text-center group hover:scale-105 transition-all duration-300">
-//             <Clock className="w-12 h-12 text-green-400 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-//             <h3 className="text-xl font-bold mb-2">Schedule Recommendations</h3>
-//             <p className="text-slate-400">Smart parking suggestions based on your classes.</p>
-//           </Card>
-          
-//           <Card className="text-center group hover:scale-105 transition-all duration-300">
-//             <Shield className="w-12 h-12 text-orange-400 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-//             <h3 className="text-xl font-bold mb-2">FSC Secure</h3>
-//             <p className="text-slate-400">@farmingdale.edu authentication required.</p>
-//           </Card>
-//         </div>
-//       </section>
+// ── Types ──────────────────────────────────────────────────────────────────
 
-//       {/* Live Preview Cards */}
-//       <section className="max-w-7xl mx-auto px-6 pb-24">
-//         <div className="grid lg:grid-cols-2 gap-8 items-center">
-//           <div className="space-y-6">
-//             <h2 className="text-4xl font-black bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
-//               Live Parking Status
-//             </h2>
-//             <p className="text-xl text-slate-400 max-w-lg">
-//               See exactly which lots have space right now.
-//             </p>
-//             <Link href="/status" className="inline-flex items-center space-x-2 text-blue-400 hover:text-blue-300 text-lg font-semibold group">
-//               <span>View All Lots</span>
-//               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-//             </Link>
-//           </div>
-          
-//           <div className="grid md:grid-cols-2 gap-6">
-//             <div className="group">
-//               <div className="h-40 bg-gradient-to-br from-slate-700 to-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:scale-105 transition-all duration-300">
-//                 <div className="w-16 h-16 bg-green-500 rounded-xl flex items-center justify-center mb-4">
-//                   <span className="font-bold text-white text-lg">32%</span>
-//                 </div>
-//                 <div>
-//                   <h4 className="font-bold text-white mb-1">Lot 15</h4>
-//                   <p className="text-sm text-slate-400">32/51 Available</p>
-//                 </div>
-//               </div>
-//             </div>
-//             <div className="group">
-//               <div className="h-40 bg-gradient-to-br from-slate-700 to-slate-800 rounded-2xl p-6 flex flex-col justify-between hover:scale-105 transition-all duration-300">
-//                 <div className="w-16 h-16 bg-orange-500 rounded-xl flex items-center justify-center mb-4">
-//                   <span className="font-bold text-white text-lg">68%</span>
-//                 </div>
-//                 <div>
-//                   <h4 className="font-bold text-white mb-1">Lot 15A</h4>
-//                   <p className="text-sm text-slate-400">18/46 Available</p>
-//                 </div>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       </section>
-//     </>
-//   );
-// }
+type BadgeVariant = "default" | "gold" | "outline";
+type BtnVariant   = "primary" | "secondary" | "ghost";
+type BtnSize      = "sm" | "md" | "lg";
+type OccColor     = "green" | "yellow" | "orange" | "red";
 
-'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
-import { useAuth } from '@/contexts/AuthContext';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/Button';
-import { getLots } from '@/lib/api';
-import { ParkingLot } from '@/lib/api';
-import { LogIn, LogOut, RefreshCw } from 'lucide-react';
+interface BadgeProps   { children: React.ReactNode; variant?: BadgeVariant; }
+interface BtnProps     extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  children: React.ReactNode; variant?: BtnVariant; size?: BtnSize;
+}
+interface RingProps    { percent: number; color: OccColor; }
+interface LotCardProps { name: string; percent: number; capacity: number; occupied: number; color: OccColor; delay?: number; }
+interface FeatureCardProps {icon: React.ElementType;title: string;desc: string;iconBg: string;index: number;href?: string;}
+interface StatProps    { value: string; label: string; }
+interface StepProps    { num: string; title: string; desc: string; active?: boolean; }
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '70vh'
+// ── Badge ──────────────────────────────────────────────────────────────────
+
+const Badge: React.FC<BadgeProps> = ({ children, variant = "default" }) => {
+  const styles: Record<BadgeVariant, React.CSSProperties> = {
+    default: { background: C.bgPanel,      color: C.greenBright, border: `1px solid ${C.border}` },
+    gold:    { background: "#2a1f08",      color: C.gold,        border: "1px solid #4a3510"      },
+    outline: { background: "transparent",  color: C.gold,        border: `1px solid ${C.gold}55`  },
+  };
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"4px 12px",
+      borderRadius:999, fontSize:11, fontWeight:700, letterSpacing:"0.06em", ...styles[variant] }}>
+      {children}
+    </span>
+  );
 };
 
-const center = {
-  lat: 40.7529,
-  lng: -73.4295
+// ── Button ─────────────────────────────────────────────────────────────────
+
+const Btn: React.FC<BtnProps> = ({ children, variant = "primary", size = "md", style: extra = {}, ...rest }) => {
+  const [hover, setHover] = useState(false);
+  const sizeMap: Record<BtnSize, React.CSSProperties> = {
+    sm: { padding:"8px 16px",  fontSize:13 },
+    md: { padding:"11px 22px", fontSize:14 },
+    lg: { padding:"14px 28px", fontSize:15 },
+  };
+  const variantMap: Record<BtnVariant, React.CSSProperties> = {
+    primary:   { background: C.gold,        color:"#0d1f0f", boxShadow: hover ? `0 0 24px ${C.gold}55` : `0 0 8px ${C.gold}22` },
+    secondary: { background: hover ? C.bgPanel : "transparent", color: C.text, border:`1px solid ${C.border}` },
+    ghost:     { background: "transparent", color: C.muted, padding:"8px 14px", fontSize:13 },
+  };
+  return (
+    <button
+      style={{ display:"inline-flex", alignItems:"center", gap:8, fontWeight:700,
+        borderRadius:10, cursor:"pointer", border:"none", transition:"all 0.18s ease",
+        transform: hover ? "scale(1.02)" : "scale(1)",
+        ...sizeMap[size], ...variantMap[variant], ...extra }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
 };
+
+// ── Occupancy Ring ─────────────────────────────────────────────────────────
+
+const OccupancyRing: React.FC<RingProps> = ({ percent, color }) => {
+  const colorMap: Record<OccColor, { stroke: string; track: string; label: string }> = {
+    green:  { stroke: C.greenBright, track: "#0f3320", label: C.greenBright },
+    yellow: { stroke: C.gold,        track: "#2a1f08", label: C.gold        },
+    orange: { stroke: "#e07830",     track: "#2a1008", label: "#e07830"     },
+    red:    { stroke: "#e04040",     track: "#2a0808", label: "#e04040"     },
+  };
+  const c = colorMap[color];
+  const r = 28, circ = 2 * Math.PI * r;
+  const dash = (percent / 100) * circ;
+  return (
+    <div style={{ position:"relative", width:72, height:72, flexShrink:0 }}>
+      <svg style={{ width:72, height:72, transform:"rotate(-90deg)" }} viewBox="0 0 72 72">
+        <circle cx="36" cy="36" r={r} fill="none" stroke={c.track} strokeWidth="5" />
+        <circle cx="36" cy="36" r={r} fill="none" stroke={c.stroke} strokeWidth="5"
+          strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+          style={{ transition:"stroke-dasharray 1.2s cubic-bezier(.4,0,.2,1)" }} />
+      </svg>
+      <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center",
+        justifyContent:"center", fontSize:12, fontWeight:900, color:c.label }}>
+        {percent}%
+      </span>
+    </div>
+  );
+};
+
+// ── Lot Card ───────────────────────────────────────────────────────────────
+
+const LotCard: React.FC<LotCardProps> = ({ name, percent, capacity, occupied, color, delay = 0 }) => {
+  const [anim,  setAnim]  = useState(false);
+  const [hover, setHover] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setAnim(true), delay); return () => clearTimeout(t); }, [delay]);
+  const borderColor: Record<OccColor, string> = { green: C.green, yellow: C.gold, orange:"#c06020", red:"#c03030" };
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ background: hover ? C.bgPanel : C.bgCard,
+        border:`1px solid ${hover ? borderColor[color] : C.border}`,
+        borderRadius:16, padding:"16px 18px", display:"flex", alignItems:"center",
+        justifyContent:"space-between", gap:12, cursor:"pointer",
+        transition:"all 0.2s ease", transform: hover ? "scale(1.01)" : "scale(1)" }}>
+      <div style={{ flex:1 }}>
+        <p style={{ fontSize:11, color:C.dimmed, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:4 }}>Parking Lot</p>
+        <h4 style={{ fontSize:15, fontWeight:700, color:C.text, marginBottom:6 }}>{name}</h4>
+        <p style={{ fontSize:12, color:C.muted }}>{capacity - occupied} of {capacity} spots free</p>
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <OccupancyRing percent={anim ? percent : 0} color={color} />
+        <ChevronRight size={16} color={hover ? C.gold : C.dimmed} style={{ transition:"color 0.2s" }} />
+      </div>
+    </div>
+  );
+};
+
+// ── Feature Card ───────────────────────────────────────────────────────────
+
+const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, desc, iconBg, href }) => {
+  const [hover, setHover] = useState(false);
+
+  const content = (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: hover ? C.bgPanel : C.bgCard,
+        border: `1px solid ${hover ? C.borderHover : C.border}`,
+        borderRadius: 18,
+        padding: 24,
+        transition: "all 0.25s ease",
+        transform: hover ? "translateY(-3px)" : "none",
+        boxShadow: hover ? "0 12px 40px rgba(0,0,0,0.5)" : "none",
+        cursor: href ? "pointer" : "default",
+      }}
+    >
+      <div
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 12,
+          background: iconBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 16,
+        }}
+      >
+        <Icon size={20} color="white" />
+      </div>
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>{title}</h3>
+      <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.65 }}>{desc}</p>
+    </div>
+  );
+
+  return href ? <Link href={href}>{content}</Link> : content;
+};
+
+// ── Stat ───────────────────────────────────────────────────────────────────
+
+const Stat: React.FC<StatProps> = ({ value, label }) => (
+  <div style={{ textAlign:"center" }}>
+    <div style={{ fontSize:28, fontWeight:800, color:C.gold, lineHeight:1 }}>{value}</div>
+    <div style={{ fontSize:10, color:C.dimmed, marginTop:4, textTransform:"uppercase", letterSpacing:"0.1em", fontWeight:600 }}>{label}</div>
+  </div>
+);
+
+// ── Step ───────────────────────────────────────────────────────────────────
+
+const Step: React.FC<StepProps> = ({ num, title, desc, active }) => (
+  <div style={{ display:"flex", gap:16, alignItems:"flex-start", padding:16, borderRadius:14,
+    background: active ? C.bgPanel : "transparent",
+    border: active ? `1px solid ${C.border}` : "1px solid transparent" }}>
+    <span style={{ fontSize:22, fontWeight:800, color: active ? C.gold : C.dimmed, minWidth:36, lineHeight:1 }}>{num}</span>
+    <div>
+      <h4 style={{ fontSize:14, fontWeight:600, color:C.text, marginBottom:4 }}>{title}</h4>
+      <p style={{ fontSize:12, color:C.muted, lineHeight:1.6 }}>{desc}</p>
+    </div>
+  </div>
+);
+
+// ── Page ───────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const { user, logout, loading: authLoading } = useAuth();
-  const router = useRouter();
-  const [lots, setLots] = useState<ParkingLot[]>([]);
-  const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null);
-  const [mapLoading, setMapLoading] = useState(true);
-
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ['places'] as any,
-  });
-
-  const fetchLots = useCallback(async () => {
-    try {
-      const data = await getLots();
-      setLots(data);
-    } catch (error) {
-      console.error('Failed to fetch lots:', error);
-    }
+  const [pulse, setPulse] = useState(false);
+  useEffect(() => {
+    const i = setInterval(() => setPulse(p => !p), 2000);
+    return () => clearInterval(i);
   }, []);
 
-  useEffect(() => {
-    if (!authLoading) {
-      fetchLots();
-      const interval = setInterval(fetchLots, 30000); // Refresh every 30s
-      return () => clearInterval(interval);
-    }
-  }, [authLoading, fetchLots]);
+  const features: Omit<FeatureCardProps, "index">[] = [
+  {
+    icon: Users,
+    title: "Real-Time Occupancy",
+    desc: "Live spot counts across all campus lots, updated every minute.",
+    iconBg: "#0f3d20",
+    href: "/status",
+  },
+  {
+    icon: Camera,
+    title: "AI Photo Detection",
+    desc: "Computer vision scans lot images to detect open spots automatically.",
+    iconBg: "#0f1f3d",
+    href: "/ai",
+  },
+  {
+    icon: Clock,
+    title: "Schedule-Based Recs",
+    desc: "Recommends the best lot based on your class times and walking distance.",
+    iconBg: "#2a1f08",
+    href: "/schedule",
+  },
+  {
+    icon: Shield,
+    title: "FSC Secured",
+    desc: "Only @farmingdale.edu accounts can access the system.",
+    iconBg: "#1f0f30",
+    href: "/login",
+  },
+];
 
-  const onMarkerClick = (lot: ParkingLot) => {
-    if (lot.id === 'lot15' || lot.id === 'lot15A') {
-      setSelectedLot(lot);
-    }
-  };
-
-  const getMarkerColor = (occupancyColor: string) => {
-    const colors: Record<string, string> = {
-      green: '#00FF00',
-      yellow: '#FFFF00',
-      orange: '#FFA500',
-      red: '#FF0000'
-    };
-    return colors[occupancyColor] || '#808080';
-  };
-
-  if (loadError) return <div className="p-8 text-center">Error loading maps</div>;
-  if (!isLoaded || authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-slate-400">Loading parking data...</p>
-        </div>
-      </div>
-    );
-  }
+  const steps: StepProps[] = [
+    { num:"01", title:"Sign in with @farmingdale.edu", desc:"Secure authentication — no new account needed.",        active:true  },
+    { num:"02", title:"Add your class schedule",       desc:"We predict lot demand around your class times.",        active:false },
+    { num:"03", title:"Get a parking recommendation",  desc:"Arrive on time with the best spot already found.",     active:false },
+  ];
 
   return (
-    <div className="min-h-screen">
-      {/* Auth Header */}
-      <div className="bg-slate-900/95 backdrop-blur-md border-b border-slate-700 p-4 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-            🅿️ Ram Park
-          </h1>
-          <div className="flex items-center space-x-4">
-            {user ? (
-              <>
-                <span className="text-sm text-slate-300 hidden md:inline">
-                  Hi, {user.email}
-                </span>
-                <Button variant="danger" size="sm" onClick={logout}>
-                  <LogOut size={16} className="mr-1" />
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <Button onClick={() => router.push('/auth')}>
-                <LogIn size={16} className="mr-1" />
-                Sign In
-              </Button>
-            )}
-            <Button onClick={fetchLots} size="sm" variant="secondary">
-              <RefreshCw size={16} className="mr-1" />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"'Inter', system-ui, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { box-sizing:border-box; margin:0; padding:0; }
+        @keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes fadeUp  { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
+        .anim-float  { animation: float  7s ease-in-out infinite; }
+        .anim-fadeUp { animation: fadeUp 0.7s ease-out both; }
+        .gold-shimmer {
+          background: linear-gradient(90deg, ${C.gold}, ${C.goldLight}, #fff8e0, ${C.gold});
+          background-size: 200% auto;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+          animation: shimmer 4s linear infinite;
+        }
+        ::-webkit-scrollbar { width:6px; }
+        ::-webkit-scrollbar-track { background:${C.bg}; }
+        ::-webkit-scrollbar-thumb { background:${C.border}; border-radius:3px; }
+      `}</style>
 
-      {!user && (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 p-8">
-          <div className="text-center max-w-md space-y-6">
-            <h2 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
-              Welcome to Ram Park
-            </h2>
-            <p className="text-xl text-slate-400 max-w-lg mx-auto leading-relaxed">
-              Real-time campus parking with AI photo simulation. Sign in with your @farmingdale.edu account.
+      {/* ── NAVBAR ── */}
+      <nav style={{ position:"fixed", top:0, left:0, right:0, zIndex:100,
+        background:`${C.bg}ee`, backdropFilter:"blur(16px)",
+        borderBottom:`1px solid ${C.border}44`, padding:"0 24px" }}>
+        <div style={{ maxWidth:1100, margin:"0 auto", height:64,
+          display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div style={{ width:34, height:34, borderRadius:9, background:C.bgPanel,
+              border:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <MapPin size={16} color={C.gold} />
+            </div>
+            <span style={{ fontWeight:800, fontSize:17, color:C.text }}>RamPark</span>
+            <Badge variant="gold">FSC</Badge>
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+        <Link href="/status">
+        <Btn variant="ghost">Status</Btn>
+      </Link>
+      <Link href="/schedule">
+      <Btn variant="ghost">Schedule</Btn>
+    </Link>
+    <Link href="/map">
+    <Btn variant="ghost">Map</Btn>
+    </Link>
+    <Link href="/ai">
+    <Btn variant="ghost">AI Demo</Btn>
+    </Link>
+          </div>
+          <Btn variant="primary" size="sm">Sign In <ArrowRight size={14} /></Btn>
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section style={{ position:"relative", minHeight:"100vh", display:"flex",
+        alignItems:"center", paddingTop:80, overflow:"hidden" }}>
+        {/* BG decorations */}
+        <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
+          <div style={{ position:"absolute", top:"20%", left:"5%", width:500, height:500,
+            background:`radial-gradient(circle, ${C.bgPanel}cc 0%, transparent 70%)`, borderRadius:"50%" }} />
+          <div style={{ position:"absolute", bottom:"10%", right:"5%", width:350, height:350,
+            background:`radial-gradient(circle, #1a2d0f88 0%, transparent 70%)`, borderRadius:"50%" }} />
+          <svg style={{ position:"absolute", inset:0, width:"100%", height:"100%", opacity:0.05 }}>
+            <defs>
+              <pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="1" fill={C.green} />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#dots)" />
+          </svg>
+          <div style={{ position:"absolute", top:0, left:0, right:0, height:2,
+            background:`linear-gradient(90deg, transparent, ${C.gold}66, transparent)` }} />
+        </div>
+
+        <div className="anim-fadeUp"
+          style={{ position:"relative", maxWidth:1100, margin:"0 auto", padding:"80px 24px",
+            display:"grid", gridTemplateColumns:"1fr 1fr", gap:64, alignItems:"center" }}>
+
+          {/* Left */}
+          <div style={{ display:"flex", flexDirection:"column", gap:28 }}>
+            {/* Live pill */}
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ width:8, height:8, borderRadius:"50%", background:C.greenBright,
+                opacity: pulse ? 1 : 0.3, transition:"opacity 0.7s ease",
+                boxShadow: pulse ? `0 0 12px ${C.greenBright}` : "none" }} />
+              <span style={{ fontSize:13, color:C.greenBright, fontWeight:600, letterSpacing:"0.04em" }}>
+                System Live · Farmingdale State College
+              </span>
+            </div>
+
+            {/* Hero heading — Inter, normal tracking, no stretch */}
+            <div>
+              <h1 style={{ fontSize:"clamp(42px,5vw,64px)", fontWeight:800,
+                lineHeight:1.08, letterSpacing:"-0.01em", color:C.text }}>
+                Campus<br />
+                <span className="gold-shimmer">Parking</span><br />
+                Reimagined
+              </h1>
+            </div>
+
+            <p style={{ fontSize:17, color:C.muted, lineHeight:1.7, maxWidth:420 }}>
+              Real-time occupancy, AI-powered spot detection, and schedule-aware lot recommendations — built exclusively for FSC students and staff.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" onClick={() => router.push('/auth')} className="w-full sm:w-auto">
-                <LogIn size={20} className="mr-2" />
-                Sign In
-              </Button>
-              <Button size="lg" variant="secondary" onClick={() => router.push('/status')}>
-                Live Status →
-              </Button>
+
+            <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
+            <Link href="/status">
+            <Btn variant="primary" size="lg">
+            View Live Status <ArrowRight size={16} />
+            </Btn>
+            </Link>
+            <Link href="/ai">
+            <Btn variant="secondary" size="lg">
+            <Zap size={15} color={C.gold} /> Try AI Demo
+            </Btn>
+            </Link>
+            </div>
+
+            {/* Stats */}
+            <div style={{ display:"flex", gap:32, paddingTop:16, borderTop:`1px solid ${C.border}55` }}>
+              <Stat value="2"   label="Lots"    />
+              <div style={{ width:1, background:C.border }} />
+              <Stat value="97"  label="Spots"   />
+              <div style={{ width:1, background:C.border }} />
+              <Stat value="<1m" label="Refresh" />
+            </div>
+          </div>
+
+          {/* Right — floating card */}
+          <div className="anim-float">
+            <div style={{ background:C.bgCard, border:`1px solid ${C.border}`,
+              borderRadius:24, padding:24,
+              boxShadow:`0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px ${C.border}22` }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
+                <div>
+                  <p style={{ fontSize:10, color:C.dimmed, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.1em", marginBottom:4 }}>Live Overview</p>
+                  <h3 style={{ fontSize:17, fontWeight:700, color:C.text }}>Campus Lots</h3>
+                </div>
+                <Badge>
+                  <span style={{ width:6, height:6, borderRadius:"50%", background:C.greenBright,
+                    display:"inline-block", boxShadow:`0 0 6px ${C.greenBright}` }} />
+                  Updated now
+                </Badge>
+              </div>
+              <div style={{ height:1, background:`linear-gradient(90deg, ${C.gold}44, transparent)`, marginBottom:16 }} />
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                <LotCard name="Lot 15 — Student" percent={32} capacity={51} occupied={17} color="green"  delay={300} />
+                <LotCard name="Lot 15A — Staff"  percent={68} capacity={46} occupied={31} color="orange" delay={550} />
+              </div>
+              <a href="/status" style={{ display:"flex", alignItems:"center", justifyContent:"center",
+                gap:6, fontSize:13, color:C.gold, fontWeight:700, textDecoration:"none",
+                marginTop:16, paddingTop:14, borderTop:`1px solid ${C.border}44` }}>
+                View all lots <ArrowRight size={14} />
+              </a>
             </div>
           </div>
         </div>
-      )}
+      </section>
 
-      {user && (
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid lg:grid-cols-4 gap-8">
-            {/* Map */}
-            <div className="lg:col-span-3">
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 mb-6">
-                <h2 className="text-2xl font-bold mb-2">🗺️ Campus Parking Map</h2>
-                <p className="text-slate-400 text-sm">
-                  Click green/orange markers (Lot 15, 15A) for spot details
-                </p>
-              </div>
-              <GoogleMap
-                mapContainerStyle={mapContainerStyle}
-                center={center}
-                zoom={16}
-                mapContainerClassName="rounded-2xl shadow-2xl"
-              >
-                {lots.map((lot) => (
-                  <Marker
-                    key={lot.id}
-                    position={{ lat: lot.lat, lng: lot.lng }}
-                    onClick={() => onMarkerClick(lot)}
-                    icon={{
-                      path: google.maps.SymbolPath.CIRCLE,
-                      scale: 14,
-                      fillColor: getMarkerColor(lot.occupancyColor),
-                      fillOpacity: 0.8,
-                      strokeWeight: 3,
-                      strokeColor: 'white'
-                    }}
-                    title={`${lot.name} - ${lot.predictedOccupancy}% occupied`}
-                  />
-                ))}
-              </GoogleMap>
+      {/* ── FEATURES ── */}
+      <section style={{ maxWidth:1100, margin:"0 auto", padding:"0 24px 96px" }}>
+        <div style={{ textAlign:"center", marginBottom:56 }}>
+          <Badge variant="gold">Features</Badge>
+          <h2 style={{ fontSize:"clamp(28px,4vw,44px)", fontWeight:800, color:C.text, marginTop:16, marginBottom:12 }}>
+            Everything you need
+          </h2>
+          <p style={{ fontSize:16, color:C.muted, maxWidth:480, margin:"0 auto", lineHeight:1.6 }}>
+            A complete parking intelligence platform, purpose-built for Farmingdale State College.
+          </p>
+        </div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14 }}>
+          {features.map((f, i) => <FeatureCard key={f.title} {...f} index={i} />)}
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ── */}
+      <section style={{ maxWidth:1100, margin:"0 auto", padding:"0 24px 112px" }}>
+        <div style={{ background:C.bgCard, border:`1px solid ${C.border}`,
+          borderRadius:28, padding:"56px 64px", position:"relative", overflow:"hidden" }}>
+          <div style={{ position:"absolute", top:-60, right:-60, width:240, height:240,
+            background:`radial-gradient(circle, ${C.gold}0f 0%, transparent 70%)`,
+            borderRadius:"50%", pointerEvents:"none" }} />
+          <div style={{ position:"absolute", bottom:0, left:0, right:0, height:2,
+            background:`linear-gradient(90deg, transparent, ${C.gold}44, transparent)` }} />
+
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:64, alignItems:"center" }}>
+            <div>
+              <Badge variant="gold">How it works</Badge>
+              <h2 style={{ fontSize:"clamp(24px,3vw,38px)", fontWeight:800, color:C.text,
+                marginTop:16, marginBottom:16, lineHeight:1.15 }}>
+                Smarter parking starts with your schedule
+              </h2>
+              <p style={{ fontSize:15, color:C.muted, lineHeight:1.7, marginBottom:28 }}>
+                Sign in with your FSC account, add your class schedule, and RamPark predicts the best lot — before you even leave home.
+              </p>
+              <Btn variant="primary" size="lg">Get Started <ArrowRight size={16} /></Btn>
             </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-6 sticky top-24">
-                <h3 className="text-xl font-bold mb-4">Live Status</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {lots.map((lot) => (
-                    <div key={lot.id} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-xl hover:bg-slate-600/50 transition-all">
-                      <span className="font-medium truncate">{lot.name}</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        lot.occupancyColor === 'green' ? 'bg-green-500' :
-                        lot.occupancyColor === 'yellow' ? 'bg-yellow-500 text-black' :
-                        lot.occupancyColor === 'orange' ? 'bg-orange-500' : 'bg-red-500'
-                      }`}>
-                        {lot.predictedOccupancy}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {selectedLot && (
-                <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-2 border-blue-500/30 rounded-2xl p-6">
-                  <h3 className="text-xl font-bold mb-4">{selectedLot.name}</h3>
-                  <p className="text-slate-400 mb-4 text-sm">
-                    {Math.round(selectedLot.totalCapacity * (1 - selectedLot.predictedOccupancy / 100))} / {selectedLot.totalCapacity} available
-                  </p>
-                  <Link href={`/lot/${selectedLot.id}`}>
-                    <Button size="lg" className="w-full">
-                      📸 View Spots & Upload Photo
-                    </Button>
-                  </Link>
-                </div>
-              )}
+            <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+              {steps.map(s => <Step key={s.num} {...s} />)}
             </div>
           </div>
         </div>
-      )}
+      </section>
+
+      {/* ── FOOTER ── */}
+      <footer style={{ borderTop:`1px solid ${C.border}44`, padding:"28px 24px" }}>
+        <div style={{ maxWidth:1100, margin:"0 auto", display:"flex",
+          alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, color:C.dimmed }}>
+            <MapPin size={14} color={C.gold} />
+            <span>RamPark · Farmingdale State College · State University of New York</span>
+          </div>
+          <p style={{ fontSize:12, color:C.dimmed }}>@farmingdale.edu access only</p>
+        </div>
+      </footer>
     </div>
   );
 }
