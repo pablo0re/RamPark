@@ -71,8 +71,8 @@ export default function StatusPage() {
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {lots.map((lot) => (
-            <ParkingCard key={lot.id} lot={lot} />
+          {lots.map((lot,index) => (
+            <ParkingCard key={index} lot={lot} />
           ))}
         </div>
 

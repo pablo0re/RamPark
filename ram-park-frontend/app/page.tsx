@@ -2,6 +2,9 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap } from "lucide-react";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 
 const C = {
   bg:          "#0d2818",
@@ -18,8 +21,6 @@ const C = {
   dimmed:      "#4a6e58",
 } as const;
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 type BadgeVariant = "default" | "gold" | "outline";
 type BtnVariant   = "primary" | "secondary" | "ghost";
 type BtnSize      = "sm" | "md" | "lg";
@@ -35,8 +36,6 @@ interface FeatureCardProps {icon: React.ElementType;title: string;desc: string;i
 interface StatProps    { value: string; label: string; }
 interface StepProps    { num: string; title: string; desc: string; active?: boolean; }
 
-// ── Badge ──────────────────────────────────────────────────────────────────
-
 const Badge: React.FC<BadgeProps> = ({ children, variant = "default" }) => {
   const styles: Record<BadgeVariant, React.CSSProperties> = {
     default: { background: C.bgPanel,      color: C.greenBright, border: `1px solid ${C.border}` },
@@ -50,8 +49,6 @@ const Badge: React.FC<BadgeProps> = ({ children, variant = "default" }) => {
     </span>
   );
 };
-
-// ── Button ─────────────────────────────────────────────────────────────────
 
 const Btn: React.FC<BtnProps> = ({ children, variant = "primary", size = "md", style: extra = {}, ...rest }) => {
   const [hover, setHover] = useState(false);
@@ -80,8 +77,6 @@ const Btn: React.FC<BtnProps> = ({ children, variant = "primary", size = "md", s
   );
 };
 
-// ── Occupancy Ring ─────────────────────────────────────────────────────────
-
 const OccupancyRing: React.FC<RingProps> = ({ percent, color }) => {
   const colorMap: Record<OccColor, { stroke: string; track: string; label: string }> = {
     green:  { stroke: C.greenBright, track: "#0f3320", label: C.greenBright },
@@ -108,8 +103,6 @@ const OccupancyRing: React.FC<RingProps> = ({ percent, color }) => {
   );
 };
 
-// ── Lot Card ───────────────────────────────────────────────────────────────
-
 const LotCard: React.FC<LotCardProps> = ({ name, percent, capacity, occupied, color, delay = 0 }) => {
   const [anim,  setAnim]  = useState(false);
   const [hover, setHover] = useState(false);
@@ -134,8 +127,6 @@ const LotCard: React.FC<LotCardProps> = ({ name, percent, capacity, occupied, co
     </div>
   );
 };
-
-// ── Feature Card ───────────────────────────────────────────────────────────
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, desc, iconBg, href }) => {
   const [hover, setHover] = useState(false);
@@ -177,16 +168,12 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ icon: Icon, title, desc, icon
   return href ? <Link href={href}>{content}</Link> : content;
 };
 
-// ── Stat ───────────────────────────────────────────────────────────────────
-
 const Stat: React.FC<StatProps> = ({ value, label }) => (
   <div style={{ textAlign:"center" }}>
     <div style={{ fontSize:28, fontWeight:800, color:C.gold, lineHeight:1 }}>{value}</div>
     <div style={{ fontSize:10, color:C.dimmed, marginTop:4, textTransform:"uppercase", letterSpacing:"0.1em", fontWeight:600 }}>{label}</div>
   </div>
 );
-
-// ── Step ───────────────────────────────────────────────────────────────────
 
 const Step: React.FC<StepProps> = ({ num, title, desc, active }) => (
   <div style={{ display:"flex", gap:16, alignItems:"flex-start", padding:16, borderRadius:14,
@@ -200,10 +187,10 @@ const Step: React.FC<StepProps> = ({ num, title, desc, active }) => (
   </div>
 );
 
-// ── Page ───────────────────────────────────────────────────────────────────
-
 export default function HomePage() {
   const [pulse, setPulse] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [user] = useAuthState(auth);
   useEffect(() => {
     const i = setInterval(() => setPulse(p => !p), 2000);
     return () => clearInterval(i);
@@ -236,7 +223,7 @@ export default function HomePage() {
     title: "FSC Secured",
     desc: "Only @farmingdale.edu accounts can access the system.",
     iconBg: "#1f0f30",
-    href: "/login",
+    href: "/sign-in",
   },
 ];
 
@@ -269,42 +256,150 @@ export default function HomePage() {
         ::-webkit-scrollbar-thumb { background:${C.border}; border-radius:3px; }
       `}</style>
 
-      {/* ── NAVBAR ── */}
       <nav style={{ position:"fixed", top:0, left:0, right:0, zIndex:100,
-        background:`${C.bg}ee`, backdropFilter:"blur(16px)",
-        borderBottom:`1px solid ${C.border}44`, padding:"0 24px" }}>
-        <div style={{ maxWidth:1100, margin:"0 auto", height:64,
-          display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <div style={{ width:34, height:34, borderRadius:9, background:C.bgPanel,
-              border:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
-              <MapPin size={16} color={C.gold} />
-            </div>
-            <span style={{ fontWeight:800, fontSize:17, color:C.text }}>RamPark</span>
-            <Badge variant="gold">FSC</Badge>
-          </div>
-          <div style={{ display:"flex", gap:6 }}>
-        <Link href="/status">
-        <Btn variant="ghost">Status</Btn>
-      </Link>
-      <Link href="/schedule">
-      <Btn variant="ghost">Schedule</Btn>
-    </Link>
-    <Link href="/map">
-    <Btn variant="ghost">Map</Btn>
-    </Link>
-    <Link href="/ai">
-    <Btn variant="ghost">AI Demo</Btn>
-    </Link>
-          </div>
-          <Btn variant="primary" size="sm">Sign In <ArrowRight size={14} /></Btn>
-        </div>
-      </nav>
+  background:`${C.bg}ee`, backdropFilter:"blur(16px)",
+  borderBottom:`1px solid ${C.border}44`, padding:"0 24px" }}>
+  <div style={{ maxWidth:1100, margin:"0 auto", height:64,
+    display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+    <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      <div style={{ width:34, height:34, borderRadius:9, background:C.bgPanel,
+        border:`1px solid ${C.border}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+        <MapPin size={16} color={C.gold} />
+      </div>
+      <span style={{ fontWeight:800, fontSize:17, color:C.text }}>RamPark</span>
+      <Badge variant="gold">FSC</Badge>
+    </div>
+    
+    <div style={{ display:"flex", gap:6 }}>
+      <Link href="/status"><Btn variant="ghost">Status</Btn></Link>
+      <Link href="/schedule"><Btn variant="ghost">Schedule</Btn></Link>
+      <Link href="/map"><Btn variant="ghost">Map</Btn></Link>
+      <Link href="/ai"><Btn variant="ghost">AI Demo</Btn></Link>
+    </div>
 
-      {/* ── HERO ── */}
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      {user ? (
+        <>
+          <button
+            onClick={() => setProfileOpen(!profileOpen)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              fontWeight: 700,
+              borderRadius: 10,
+              cursor: "pointer",
+              border: `1px solid ${C.border}`,
+              background: C.bgPanel,
+              color: C.text,
+              padding: "8px 16px",
+              fontSize: 13,
+              transition: "all 0.18s ease",
+              transform: profileOpen ? "scale(1.02)" : "scale(1)",
+            }}
+          >
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "999px",
+                background: `linear-gradient(to bottom right, #10b981, #34d399)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#02140a",
+                boxShadow: `0 2px 8px rgba(16, 185, 129, 0.4)`,
+              }}
+            >
+              {(user.displayName || user.email || "U")
+                .charAt(0)
+                .toUpperCase()}
+            </div>
+            <span style={{ fontSize: 13 }}>
+              {user.displayName || user.email?.split("@")[0] || "User"}
+            </span>
+          </button>
+
+          {profileOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                marginTop: 8,
+                width: 220,
+                background: C.bgCard,
+                border: `1px solid ${C.border}`,
+                borderRadius: 16,
+                boxShadow: `0 20px 40px rgba(0,0,0,0.6)`,
+                zIndex: 1000,
+              }}
+            >
+              <div style={{ padding: "12px 16px", fontSize: 11, color: C.muted }}>
+                Welcome Back!!
+              </div>
+              <div
+                style={{
+                  padding: "8px 16px",
+                  borderTop: `1px solid ${C.border}`,
+                  cursor: "pointer",
+                  color: C.text,
+                  fontSize: 12,
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = C.bgPanel)
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+                onClick={() => {
+                  console.log("Settings clicked");
+                  setProfileOpen(false);
+                }}
+              >
+                Settings
+              </div>
+              <div
+                style={{
+                  padding: "8px 16px",
+                  borderTop: `1px solid ${C.border}`,
+                  cursor: "pointer",
+                  color: "#ef4444",
+                  fontSize: 12,
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#1a0f0f")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+                onClick={async () => {
+                  await signOut(auth);
+                  setProfileOpen(false);
+                }}
+              >
+                Log out
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <Link href="/sign-in">
+          <Btn variant="primary" size="sm">
+            Sign In <ArrowRight size={14} />
+          </Btn>
+        </Link>
+      )}
+    </div>
+  </div>
+</nav>
+
       <section style={{ position:"relative", minHeight:"100vh", display:"flex",
         alignItems:"center", paddingTop:80, overflow:"hidden" }}>
-        {/* BG decorations */}
         <div style={{ position:"absolute", inset:0, pointerEvents:"none" }}>
           <div style={{ position:"absolute", top:"20%", left:"5%", width:500, height:500,
             background:`radial-gradient(circle, ${C.bgPanel}cc 0%, transparent 70%)`, borderRadius:"50%" }} />
@@ -326,9 +421,7 @@ export default function HomePage() {
           style={{ position:"relative", maxWidth:1100, margin:"0 auto", padding:"80px 24px",
             display:"grid", gridTemplateColumns:"1fr 1fr", gap:64, alignItems:"center" }}>
 
-          {/* Left */}
           <div style={{ display:"flex", flexDirection:"column", gap:28 }}>
-            {/* Live pill */}
             <div style={{ display:"flex", alignItems:"center", gap:10 }}>
               <div style={{ width:8, height:8, borderRadius:"50%", background:C.greenBright,
                 opacity: pulse ? 1 : 0.3, transition:"opacity 0.7s ease",
@@ -338,7 +431,6 @@ export default function HomePage() {
               </span>
             </div>
 
-            {/* Hero heading — Inter, normal tracking, no stretch */}
             <div>
               <h1 style={{ fontSize:"clamp(42px,5vw,64px)", fontWeight:800,
                 lineHeight:1.08, letterSpacing:"-0.01em", color:C.text }}>
@@ -365,7 +457,6 @@ export default function HomePage() {
             </Link>
             </div>
 
-            {/* Stats */}
             <div style={{ display:"flex", gap:32, paddingTop:16, borderTop:`1px solid ${C.border}55` }}>
               <Stat value="2"   label="Lots"    />
               <div style={{ width:1, background:C.border }} />
@@ -375,7 +466,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right — floating card */}
           <div className="anim-float">
             <div style={{ background:C.bgCard, border:`1px solid ${C.border}`,
               borderRadius:24, padding:24,
@@ -406,7 +496,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── FEATURES ── */}
       <section style={{ maxWidth:1100, margin:"0 auto", padding:"0 24px 96px" }}>
         <div style={{ textAlign:"center", marginBottom:56 }}>
           <Badge variant="gold">Features</Badge>
@@ -422,7 +511,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
       <section style={{ maxWidth:1100, margin:"0 auto", padding:"0 24px 112px" }}>
         <div style={{ background:C.bgCard, border:`1px solid ${C.border}`,
           borderRadius:28, padding:"56px 64px", position:"relative", overflow:"hidden" }}>
@@ -442,7 +530,7 @@ export default function HomePage() {
               <p style={{ fontSize:15, color:C.muted, lineHeight:1.7, marginBottom:28 }}>
                 Sign in with your FSC account, add your class schedule, and RamPark predicts the best lot — before you even leave home.
               </p>
-              <Btn variant="primary" size="lg">Get Started <ArrowRight size={16} /></Btn>
+              <Btn variant="primary" size="lg">Get Started <ArrowRight size={16}  /></Btn>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
               {steps.map(s => <Step key={s.num} {...s} />)}
@@ -451,7 +539,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
       <footer style={{ borderTop:`1px solid ${C.border}44`, padding:"28px 24px" }}>
         <div style={{ maxWidth:1100, margin:"0 auto", display:"flex",
           alignItems:"center", justifyContent:"space-between" }}>

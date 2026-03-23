@@ -52,13 +52,12 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
   return (
     <Card className="shadow-xl border-0">
       <CardHeader className="pb-4">
-        <h2 className="text-2xl font-bold text-center">📸 Photo Upload</h2>
-        <p className="text-center text-gray-600 text-sm">Lot {lotId.toUpperCase()}</p>
+        <h2 className="text-2xl font-bold text-center text-black"> Photo Upload</h2>
+        <p className="text-center text-black-600 text-sm">Lot {lotId.toUpperCase()}</p>
       </CardHeader>
       
       <CardContent className="p-8">
         <div className="space-y-6">
-          {/* Upload */}
           <div className="border-2 border-dashed border-gray-300 rounded-2xl p-12 text-center hover:border-blue-500 hover:bg-blue-50 transition-all cursor-pointer group">
             <input
               type="file"
@@ -83,7 +82,6 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
             </label>
           </div>
 
-          {/* File Preview */}
           {selectedFile && (
             <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl border-2 border-dashed border-blue-200">
               <img
@@ -108,7 +106,6 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
             </div>
           )}
 
-          {/* Button */}
           {selectedFile && !uploading && (
             <Button
               size="lg"
@@ -121,7 +118,6 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
             </Button>
           )}
 
-          {/* Loading */}
           {uploading && (
             <div className="flex items-center space-x-3 p-6 bg-blue-50 rounded-xl border-2 border-blue-200">
               <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
@@ -132,7 +128,6 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
             </div>
           )}
 
-          {/* Success */}
           {result && (
             <div className="p-6 bg-green-50 border-2 border-green-200 rounded-xl">
               <div className="flex items-center space-x-3 mb-4">
@@ -154,7 +149,6 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
             </div>
           )}
 
-          {/* Fail */}
           {error && (
             <div className="p-6 bg-red-50 border-2 border-red-200 rounded-xl">
               <div className="flex items-center space-x-3">

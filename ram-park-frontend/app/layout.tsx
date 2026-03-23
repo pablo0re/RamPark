@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import NavBar from '@/components/NavBar';
+
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -16,13 +18,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} bg-white dark:bg-slate-900`}>
+    <html lang="en" className="bg-[#0d2818] text-slate-50" suppressHydrationWarning>
+      <body className={`${inter.className} bg-[#0d2818] text-slate-50`}>
         <AuthProvider>
-              {/* Page Content */}
-              <main className="flex-1 overflow-y-auto p-6">
-                {children}
-              </main>
+          <div className="min-h-screen flex flex-col">
+            <NavBar />
+            <main className="flex-1">
+              {children}
+            </main>
+          </div>
         </AuthProvider>
       </body>
     </html>

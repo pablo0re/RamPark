@@ -64,7 +64,6 @@ export default function PredictionsPage() {
         </p>
       </div>
 
-      {/*  Stats */}
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         <Card className="shadow-xl border-green-200 bg-green-50">
           <CardHeader className="text-center">
@@ -103,7 +102,6 @@ export default function PredictionsPage() {
         </Card>
       </div>
 
-      {/* Lot Predictions */}
       <Card className="shadow-2xl">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">

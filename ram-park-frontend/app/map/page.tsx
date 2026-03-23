@@ -89,7 +89,6 @@ export default function MapPage() {
           <div className="lg:col-span-3">
             <Card className="shadow-2xl border-[#2a5438] bg-[#142a1e]">
               <CardContent className="p-0">
-                {/* map as before, maybe change loading bg */}
                 {!isLoaded ? (
                   <div className="h-[600px] flex items-center justify-center bg-[#1a3d28]">
                     <div className="animate-spin w-12 h-12 border-4 border-emerald-400 border-t-transparent rounded-full" />
@@ -111,10 +110,10 @@ export default function MapPage() {
                     ]
                   }}
                 >
-                  {lots.map((lot) => (
+                  {lots.map((lot, index) => (
                     <Marker
-                      key={lot.id}
-                      position={{ lat: lot.lat, lng: lot.lng }}
+                      key={index}
+                      position={{ lat: lot.lat!, lng: lot.lng! }}
                       onClick={() => onMarkerClick(lot)}
                       icon={{
                         path: google.maps.SymbolPath.CIRCLE,
@@ -134,9 +133,7 @@ export default function MapPage() {
           </Card>
         </div>
 
-        {/* Lot Legend & Selected Info */}
         <div className="space-y-6">
-          {/* Legend */}
           <Card className="shadow-xl bg-[#142a1e] border-[#2a5438]">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2 text-sm">
@@ -153,13 +150,12 @@ export default function MapPage() {
               ].map((item) => (
                 <div key={item.color} className="flex items-center space-x-3 p-2">
                   <div className={`w-4 h-4 rounded-full ${item.bg}`} />
-                  <span className="text-sm text-gray-700">{item.label}</span>
+                  <span className="text-sm text-white-700">{item.label}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          {/* Selected Lot */}
           {selectedLot && (
             <Card className="shadow-2xl border-emerald-400 bg-[#123322]">
               <CardHeader>
@@ -189,14 +185,13 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Quick Stats */}
       <Card className="shadow-xl bg-[#142a1e] border-[#2a5438]">
         <CardContent className="p-6">
           <div className="grid md:grid-cols-4 gap-6 text-center">
-            {lots.slice(0, 4).map((lot) => (
-              <div key={lot.id} className="p-4 rounded-xl hover:bg-gray-50 transition-colors">
-                <div className="text-2xl font-bold">{lot.predictedOccupancy}%</div>
-                <div className="text-sm text-gray-600 truncate">{lot.name}</div>
+            {lots.slice(0, 4).map((lot,index) => (
+              <div key={index} className="p-4 rounded-xl hover:bg-gray-50 transition-colors">
+                <div className="text-2xl text-[#10b981] font-bold">{lot.predictedOccupancy}%</div>
+                <div className="text-sm text-[#10b981] truncate">{lot.name}</div>
               </div>
             ))}
           </div>
