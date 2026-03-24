@@ -1,11 +1,53 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { getLots } from '@/lib/api';
 import { ParkingLot } from '@/lib/api';
-import { MapPin, Navigation, RefreshCw } from 'lucide-react';
+import { MapPin, Navigation, RefreshCw, Car, Locate, CheckCircle } from 'lucide-react';
+
+// ── Lot boundary polygons (FSC) ───────────────────────────────────────────────
+const LOT_BOUNDARIES: Record<string, { lat: number; lng: number }[]> = {
+  lot15: [
+    { lat: 40.753332, lng: -73.430639 },
+    { lat: 40.753332, lng: -73.430039 },
+    { lat: 40.752532, lng: -73.430039 },
+    { lat: 40.752532, lng: -73.430639 },
+  ],
+  lot15A: [
+    { lat: 40.753271, lng: -73.430236 },
+    { lat: 40.753271, lng: -73.429636 },
+    { lat: 40.752471, lng: -73.429636 },
+    { lat: 40.752471, lng: -73.430236 },
+  ],
+};
+
+function isPointInPolygon(
+  point: { lat: number; lng: number },
+  polygon: { lat: number; lng: number }[]
+): boolean {
+  const { lat: px, lng: py } = point;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lat, yi = polygon[i].lng;
+    const xj = polygon[j].lat, yj = polygon[j].lng;
+    const intersect = yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function detectLot(pos: { lat: number; lng: number }): string | null {
+  for (const [key, boundary] of Object.entries(LOT_BOUNDARIES)) {
+    if (isPointInPolygon(pos, boundary)) return key;
+  }
+  return null;
+}
+
+function lotLabel(key: string) {
+  return key === 'lot15' ? 'Student Lot 15' : 'Staff Lot 15A';
+}
 
 const containerStyle = {
   width: '100%',
@@ -21,6 +63,16 @@ export default function MapPage() {
   const [lots, setLots] = useState<ParkingLot[]>([]);
   const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null);
   const [mapKey, setMapKey] = useState(0);
+
+  // Location tracking
+  const [trackingActive, setTrackingActive] = useState(false);
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [detectedLot, setDetectedLot] = useState<string | null>(null);
+  const [isParked, setIsParked] = useState(false);
+  const [parkedLot, setParkedLot] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const mapRefInternal = useRef<google.maps.Map | null>(null);
+  const firstFixRef = useRef(true);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -45,7 +97,7 @@ export default function MapPage() {
   const getMarkerColor = (color: string) => {
     const colors: Record<string, string> = {
       green: '#10B981',
-      yellow: '#F59E0B', 
+      yellow: '#F59E0B',
       orange: '#F97316',
       red: '#EF4444'
     };
@@ -54,6 +106,54 @@ export default function MapPage() {
 
   const onMarkerClick = (lot: ParkingLot) => {
     setSelectedLot(lot);
+  };
+
+  const startTracking = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setTrackingActive(true);
+    firstFixRef.current = true;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setUserPos(pos);
+        if (firstFixRef.current && mapRefInternal.current) {
+          mapRefInternal.current.panTo(pos);
+          mapRefInternal.current.setZoom(18);
+          firstFixRef.current = false;
+        }
+        setDetectedLot(detectLot(pos));
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+        setTrackingActive(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+  }, []);
+
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setTrackingActive(false);
+    setUserPos(null);
+    setDetectedLot(null);
+    firstFixRef.current = true;
+  }, []);
+
+  useEffect(() => () => stopTracking(), [stopTracking]);
+
+  const handleImParked = () => {
+    if (!detectedLot) return;
+    setIsParked(true);
+    setParkedLot(detectedLot);
+    // TODO: log parking session to backend
+  };
+
+  const handleLeave = () => {
+    setIsParked(false);
+    setParkedLot(null);
   };
 
   const refreshMap = () => {
@@ -78,12 +178,59 @@ export default function MapPage() {
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
+            <Button
+              onClick={trackingActive ? stopTracking : startTracking}
+              className={trackingActive
+                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                : 'bg-[#142a1e] border border-[#2a5438] text-emerald-300 hover:border-emerald-400'}
+            >
+              <Locate className="w-4 h-4 mr-2" />
+              {trackingActive ? 'Tracking On' : 'Track My Location'}
+            </Button>
             <Button size="lg" className="bg-emerald-500 hover:bg-emerald-400 text-slate-900">
               <Navigation className="w-5 h-5 mr-2" />
               Navigate
             </Button>
           </div>
         </div>
+
+        {/* Parked confirmation banner */}
+        {isParked && parkedLot && (
+          <div className="flex items-center justify-between bg-emerald-900/60 border border-emerald-400/60 rounded-2xl px-6 py-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-6 h-6 text-emerald-400" />
+              <div>
+                <p className="font-bold text-emerald-100">You&apos;re parked!</p>
+                <p className="text-sm text-emerald-300">{lotLabel(parkedLot)}</p>
+              </div>
+            </div>
+            <button
+              onClick={handleLeave}
+              className="px-4 py-2 rounded-xl bg-red-700/60 hover:bg-red-700 border border-red-500/50 text-red-200 text-sm font-semibold transition"
+            >
+              I&apos;ve Left
+            </button>
+          </div>
+        )}
+
+        {/* Detected in lot — I'm Parked prompt */}
+        {trackingActive && detectedLot && !isParked && (
+          <div className="flex items-center justify-between bg-[#1a3d28] border border-[#e0b83a]/50 rounded-2xl px-6 py-4">
+            <div className="flex items-center gap-3">
+              <Car className="w-6 h-6 text-[#e0b83a]" />
+              <div>
+                <p className="font-bold text-[#e0b83a]">You&apos;re in {lotLabel(detectedLot)}</p>
+                <p className="text-sm text-slate-400">Are you parking here?</p>
+              </div>
+            </div>
+            <button
+              onClick={handleImParked}
+              className="px-5 py-2 rounded-xl bg-[#e0b83a] hover:bg-[#f0c94d] text-[#132217] font-bold text-sm transition shadow-lg"
+            >
+              I&apos;m Parked
+            </button>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3">
@@ -100,6 +247,7 @@ export default function MapPage() {
                   center={center}
                   zoom={16}
                   mapTypeId="roadmap"
+                  onLoad={map => { mapRefInternal.current = map; }}
                   options={{
                     styles: [
                       {
