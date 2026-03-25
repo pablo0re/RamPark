@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut, updateProfile } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon } from 'lucide-react';
+import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon, Trash2 } from 'lucide-react';
 
 export default function TopBar() {
   const router = useRouter();
@@ -30,6 +30,26 @@ export default function TopBar() {
     router.push('/');
   };
 
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm("Are you sure you want to delete your account? This cannot be undone.");
+    if (!confirmed) return;
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch("http://127.0.0.1:8000/user/account", {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        alert("Account deleted successfully.");
+        router.push("/sign-in");
+      } else {
+        alert("Failed to delete account. Please try again.");
+      }
+    } catch (error) {
+      alert("An error occurred. Please try again.");
+    }
+  };
+
   const initials = user?.displayName
     ? user.displayName
         .split(' ')
@@ -47,7 +67,6 @@ export default function TopBar() {
     <header className="sticky top-0 z-40 w-full border-b border-[#2a5438] bg-[#0d2818]/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          {/* Settings icon */}
           <button
             onClick={() => setSettingsOpen((o) => !o)}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[#2a5438] bg-[#142a1e] text-emerald-200 hover:border-[#3a7a50] hover:text-emerald-100 transition"
@@ -128,6 +147,13 @@ export default function TopBar() {
                   >
                     <LogOut className="h-4 w-4" />
                     Log out
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-black hover:bg-red-900/40"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Account
                   </button>
                 </div>
               )}

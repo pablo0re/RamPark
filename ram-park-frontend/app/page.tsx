@@ -384,6 +384,43 @@ export default function HomePage() {
               >
                 Log out
               </div>
+              <div
+                style={{
+                  padding: "8px 16px",
+                  borderTop: `1px solid ${C.border}`,
+                  cursor: "pointer",
+                  color: "#000000",
+                  fontSize: 12,
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#1a0f0f")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "transparent")
+                }
+                onClick={async () => {
+                  const confirmed = window.confirm("Are you sure you want to delete your account? This cannot be undone.");
+                  if (!confirmed) return;
+                  try {
+                    const token = await auth.currentUser?.getIdToken();
+                    const response = await fetch("http://127.0.0.1:8000/user/account", {
+                      method: "DELETE",
+                      headers: { authorization: `Bearer ${token}` }
+                    });
+                    if (response.ok) {
+                      alert("Account deleted successfully.");
+                      setProfileOpen(false);
+                    } else {
+                      alert("Failed to delete account. Please try again.");
+                    }
+                  } catch (error) {
+                    alert("An error occurred. Please try again.");
+                  }
+                }}
+              >
+                Delete Account
+              </div>
             </div>
           )}
         </>
