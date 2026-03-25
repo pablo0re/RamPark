@@ -15,8 +15,9 @@ async def verify_token(authorization: str = Header(None)):
             raise HTTPException(status_code=403, detail="Access restricted to @farmingdale.edu emails")
         
         return decoded_token
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except Exception as e:
+        print(f"Token error: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
 async def verify_admin(user=Depends(verify_token)):
     user_doc = db.collection("users").document(user["uid"]).get()
