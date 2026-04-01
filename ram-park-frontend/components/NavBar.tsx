@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { signOut, updateProfile } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon, Trash2, MapPin } from 'lucide-react';
 
 export default function TopBar() {
   const router = useRouter();
@@ -92,7 +92,6 @@ export default function TopBar() {
             <button className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#142a1e] border border-[#2a5438] text-emerald-200 hover:border-[#3a7a50] transition">
               <Bell className="h-4 w-4" />
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#e0b83a] text-[9px] font-bold text-[#132217]">
-                3
               </span>
             </button>
           )}
@@ -162,51 +161,63 @@ export default function TopBar() {
         </div>
       </div>
 
-      {settingsOpen && (
-        <div className="absolute left-4 top-16 z-40 w-72 rounded-2xl border border-[#2a5438] bg-[#142a1e] shadow-2xl">
-          <div className="px-4 py-3 border-b border-[#2a5438]">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
-              Settings
-            </div>
-            <div className="mt-1 text-[11px] text-emerald-200/80">
-              Manage notifications, history, and account.
-            </div>
-          </div>
-          <div className="py-1">
-            <button className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28]">
-              <Bell className="h-4 w-4 text-emerald-300" />
-              Notifications
+            {settingsOpen && (
+              <div className="absolute left-4 top-16 z-40 w-72 rounded-2xl border border-[#2a5438] bg-[#142a1e] shadow-2xl">
+                <div className="px-4 py-3 border-b border-[#2a5438]">
+                   <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
+                    Settings
+                  </div>
+                <div className="mt-1 text-[11px] text-emerald-200/80">
+                  Manage notifications, history, and account.
+                </div>
+              </div>
+              <div className="py-1">
+                <Link href="/notifications" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+                <Bell className="h-4 w-4 text-emerald-300" />
+                Notifications
+                </Link>
+
+                <Link href="/history" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+                <History className="h-4 w-4 text-emerald-300" />
+                Parking history
+                </Link>
+
+                <Link href="/vehicle-profile" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+                <UserIcon className="h-4 w-4 text-emerald-300" />
+                Vehicle profile
+                </Link>
+
+                <Link href="/favorite-spots" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+                <MapPin className="h-4 w-4 text-emerald-300" />
+                Favorite spots
+                </Link>
+
+                <Link href="/theme-mode" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+                <Settings className="h-4 w-4 text-emerald-300" />
+                Theme mode
+                </Link>
+                </div>
+              <div className="border-t border-[#2a5438] py-1">
+          {user ? (
+            <button
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 px-4 py-2 text-xs text-red-300 hover:bg-red-900/40"
+          >
+              <LogOut className="h-4 w-4" />
+              Log out
             </button>
-            <button className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28]">
-              <History className="h-4 w-4 text-emerald-300" />
-              Parking history
-            </button>
-            <button className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28]">
-              <ImageIcon className="h-4 w-4 text-emerald-300" />
-              Add profile picture
-            </button>
-          </div>
-          <div className="border-t border-[#2a5438] py-1">
-            {user ? (
-              <button
-                onClick={handleLogout}
-                className="flex w-full items-center gap-3 px-4 py-2 text-xs text-red-300 hover:bg-red-900/40"
-              >
-                <LogOut className="h-4 w-4" />
-                Log off
-              </button>
             ) : (
               <Link
-                href="/sign-in"
-                className="flex w-full items-center gap-3 px-4 py-2 text-xs text-emerald-200 hover:bg-[#1a3d28]"
-              >
-                <UserIcon className="h-4 w-4 text-emerald-300" />
-                Sign in
-              </Link>
+              href="/sign-in"
+              className="flex w-full items-center gap-3 px-4 py-2 text-xs text-emerald-200 hover:bg-[#1a3d28]"
+            >
+            <UserIcon className="h-4 w-4 text-emerald-300" />
+              Sign in
+            </Link>
             )}
-          </div>
-        </div>
-      )}
-    </header>
-  );
-}
+            </div>
+            </div>
+            )}
+            </header>
+          );
+        }

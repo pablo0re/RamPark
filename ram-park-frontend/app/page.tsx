@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap, Bell } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -191,6 +192,7 @@ export default function HomePage() {
   const [pulse, setPulse] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false)
   const [user] = useAuthState(auth);
+  const router = useRouter();
   useEffect(() => {
     const i = setInterval(() => setPulse(p => !p), 2000);
     return () => clearInterval(i);
@@ -275,6 +277,13 @@ export default function HomePage() {
       <Link href="/schedule"><Btn variant="ghost">Schedule</Btn></Link>
       <Link href="/map"><Btn variant="ghost">Map</Btn></Link>
       <Link href="/ai"><Btn variant="ghost">AI Demo</Btn></Link>
+      {user && (
+            <button className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#142a1e] border border-[#2a5438] text-emerald-200 hover:border-[#3a7a50] transition">
+              <Bell className="h-4 w-4" />
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#e0b83a] text-[9px] font-bold text-[#132217]">
+              </span>
+            </button>
+          )}
     </div>
 
     <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -358,6 +367,7 @@ export default function HomePage() {
                 onClick={() => {
                   console.log("Settings clicked");
                   setProfileOpen(false);
+                  router.push("/theme-mode");
                 }}
               >
                 Settings
@@ -367,7 +377,7 @@ export default function HomePage() {
                   padding: "8px 16px",
                   borderTop: `1px solid ${C.border}`,
                   cursor: "pointer",
-                  color: "#ef4444",
+                  color: "#white",
                   fontSize: 12,
                   transition: "background 0.2s",
                 }}
@@ -380,6 +390,7 @@ export default function HomePage() {
                 onClick={async () => {
                   await signOut(auth);
                   setProfileOpen(false);
+                  
                 }}
               >
                 Log out
@@ -389,7 +400,7 @@ export default function HomePage() {
                   padding: "8px 16px",
                   borderTop: `1px solid ${C.border}`,
                   cursor: "pointer",
-                  color: "#000000",
+                  color: "white",
                   fontSize: 12,
                   transition: "background 0.2s",
                 }}
@@ -406,11 +417,15 @@ export default function HomePage() {
                     const token = await auth.currentUser?.getIdToken();
                     const response = await fetch("http://127.0.0.1:8000/user/account", {
                       method: "DELETE",
-                      headers: { authorization: `Bearer ${token}` }
+                      headers: { 
+                        "Authorization": `Bearer ${token}`,
+                        "Content-Type": "application/json"
+                      }
                     });
                     if (response.ok) {
                       alert("Account deleted successfully.");
-                      setProfileOpen(false);
+                      await signOut(auth);
+                      router.push("/");
                     } else {
                       alert("Failed to delete account. Please try again.");
                     }
@@ -567,7 +582,9 @@ export default function HomePage() {
               <p style={{ fontSize:15, color:C.muted, lineHeight:1.7, marginBottom:28 }}>
                 Sign in with your FSC account, add your class schedule, and RamPark predicts the best lot — before you even leave home.
               </p>
-              <Btn variant="primary" size="lg">Get Started <ArrowRight size={16}  /></Btn>
+              <Link href="/sign-up">
+              <Btn variant="primary" size="lg">Get Started <ArrowRight size={16}  />  </Btn>
+              </Link>
             </div>
             <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
               {steps.map(s => <Step key={s.num} {...s} />)}

@@ -36,7 +36,7 @@ export default function SignUpPage() {
       }
 
       await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/sign-in');
+      router.push('/');
     } catch (err: any) {
       setError(err.message || 'Failed to create account.');
     } finally {
