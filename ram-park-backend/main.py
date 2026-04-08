@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import parking, admin, recommendations, detection, prediction, users, feedback
+from routers import parking, admin, recommendations, detection, prediction, users, feedback, valet, reservations
+
 app = FastAPI(title="Ram Park API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Update to Vercel URL in production
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -17,6 +18,8 @@ app.include_router(detection.router, prefix="/detect", tags=["AI Simulation"])
 app.include_router(prediction.router, prefix="/predict", tags=["Prediction"])
 app.include_router(users.router, prefix="/user", tags=["User"])
 app.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])
+app.include_router(valet.router, prefix="/valet", tags=["Valet"])
+app.include_router(reservations.router, prefix="/reservations", tags=["Reservations"])
 
 @app.get("/")
 def home():

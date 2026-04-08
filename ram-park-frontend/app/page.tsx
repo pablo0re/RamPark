@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap, Bell } from "lucide-react";
+import { getValetRequests } from "@/lib/api";
+import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap, Bell, Car, X } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -193,10 +194,61 @@ export default function HomePage() {
   const [profileOpen, setProfileOpen] = useState(false)
   const [user] = useAuthState(auth);
   const router = useRouter();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [valetRequests, setValetRequests] = useState<any[]>([]);
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
+
+  const ADMIN_EMAIL = "orelpm@farmingdale.edu";
+  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
   useEffect(() => {
     const i = setInterval(() => setPulse(p => !p), 2000);
     return () => clearInterval(i);
   }, []);
+
+  useEffect(() => {
+  const key = `rampark_home_dismissed_notifications_${user?.email || 'guest'}`;
+  const saved = localStorage.getItem(key);
+
+  if (saved) {
+    try {
+      setDismissedNotifications(JSON.parse(saved));
+    } catch {
+      setDismissedNotifications([]);
+    }
+  } else {
+    setDismissedNotifications([]);
+  }
+}, [user?.email]);
+
+const saveDismissedNotifications = (updated: string[]) => {
+  const key = `rampark_home_dismissed_notifications_${user?.email || 'guest'}`;
+  setDismissedNotifications(updated);
+  localStorage.setItem(key, JSON.stringify(updated));
+};
+
+const dismissNotification = (notificationId: string) => {
+  if (dismissedNotifications.includes(notificationId)) return;
+  saveDismissedNotifications([...dismissedNotifications, notificationId]);
+};
+
+const loadValetRequests = async () => {
+  try {
+    const data = await getValetRequests();
+    setValetRequests(data);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+useEffect(() => {
+  loadValetRequests();
+
+  const interval = setInterval(() => {
+    loadValetRequests();
+  }, 4000);
+
+  return () => clearInterval(interval);
+}, []);
 
   const features: Omit<FeatureCardProps, "index">[] = [
   {
@@ -227,6 +279,13 @@ export default function HomePage() {
     iconBg: "#1f0f30",
     href: "/sign-in",
   },
+  {
+  icon: Car,
+  title: "Smart Campus Valet",
+  desc: "Request a valet during busy campus hours and drop off near your class.",
+  iconBg: "#1f3d0f",
+  href: "/valet",
+},
 ];
 
   const steps: StepProps[] = [
@@ -234,6 +293,112 @@ export default function HomePage() {
     { num:"02", title:"Add your class schedule",       desc:"We predict lot demand around your class times.",        active:false },
     { num:"03", title:"Get a parking recommendation",  desc:"Arrive on time with the best spot already found.",     active:false },
   ];
+
+  const allNotifications = useMemo(() => {
+  if (!user?.email) return [];
+
+  let relevantRequests = valetRequests;
+
+  if (!isAdmin) {
+    relevantRequests = valetRequests.filter((item) => {
+      const emailMatch =
+        item.userEmail?.toLowerCase() === user.email?.toLowerCase();
+      const nameMatch =
+        item.studentName?.toLowerCase() ===
+        (user.displayName || '').toLowerCase();
+
+      return emailMatch || nameMatch;
+    });
+  }
+
+  const notifications = relevantRequests.flatMap((item) => {
+    const notes: { id: string; text: string; createdAt: string }[] = [];
+
+    if (isAdmin) {
+      if (item.status === 'pending') {
+        notes.push({
+          id: `${item.id}-pending`,
+          text: `New valet request from ${item.studentName} at ${item.pickupLocation}.`,
+          createdAt: item.createdAt || '',
+        });
+      }
+
+      if (item.status === 'return_requested') {
+        notes.push({
+          id: `${item.id}-return_requested`,
+          text: `${item.studentName} requested the car back at ${item.returnLocation} for ${item.returnTime}.`,
+          createdAt: item.returnRequestedAt || item.createdAt || '',
+        });
+      }
+    } else {
+      if (item.status === 'pending') {
+        notes.push({
+          id: `${item.id}-pending`,
+          text: 'Your valet request is pending review.',
+          createdAt: item.createdAt || '',
+        });
+      } else if (item.status === 'approved') {
+        notes.push({
+          id: `${item.id}-approved`,
+          text: `Your valet request was approved. Assigned valet: ${item.assignedValet || 'Valet assigned'}.`,
+          createdAt: item.approvedAt || item.createdAt || '',
+        });
+      } else if (item.status === 'vehicle_received') {
+        notes.push({
+          id: `${item.id}-vehicle_received`,
+          text: 'Your vehicle has been received by the valet.',
+          createdAt: item.vehicleReceivedAt || item.createdAt || '',
+        });
+      } else if (item.status === 'parked') {
+        notes.push({
+          id: `${item.id}-parked`,
+          text: `Your vehicle is parked${item.assignedLotName ? ` in ${item.assignedLotName}` : ''}.`,
+          createdAt: item.parkedAt || item.createdAt || '',
+        });
+      } else if (item.status === 'return_requested') {
+        notes.push({
+          id: `${item.id}-return_requested`,
+          text: 'Your return request was sent to the valet.',
+          createdAt: item.returnRequestedAt || item.createdAt || '',
+        });
+      } else if (item.status === 'return_in_progress') {
+        notes.push({
+          id: `${item.id}-return_in_progress`,
+          text: 'Your vehicle return is in progress.',
+          createdAt: item.returnInProgressAt || item.createdAt || '',
+        });
+      } else if (item.status === 'completed') {
+        notes.push({
+          id: `${item.id}-completed`,
+          text: 'Your valet request has been completed.',
+          createdAt: item.completedAt || item.createdAt || '',
+        });
+      } else if (item.status === 'cancelled') {
+        notes.push({
+          id: `${item.id}-cancelled`,
+          text: 'Your valet request was cancelled.',
+          createdAt: item.cancelledAt || item.createdAt || '',
+        });
+      } else if (item.status === 'rejected') {
+        notes.push({
+          id: `${item.id}-rejected`,
+          text: 'Your valet request was rejected.',
+          createdAt: item.rejectedAt || item.createdAt || '',
+        });
+      }
+    }
+
+    return notes;
+  });
+
+  return notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}, [valetRequests, user, isAdmin]);
+
+const unreadNotifications = useMemo(() => {
+  return allNotifications.filter(
+    (note) => !dismissedNotifications.includes(note.id)
+  );
+}, [allNotifications, dismissedNotifications]);
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg, color:C.text, fontFamily:"'Inter', system-ui, sans-serif" }}>
@@ -277,13 +442,100 @@ export default function HomePage() {
       <Link href="/schedule"><Btn variant="ghost">Schedule</Btn></Link>
       <Link href="/map"><Btn variant="ghost">Map</Btn></Link>
       <Link href="/ai"><Btn variant="ghost">AI Demo</Btn></Link>
+      <Link href="/valet"><Btn variant="ghost">Valet</Btn></Link>
       {user && (
-            <button className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#142a1e] border border-[#2a5438] text-emerald-200 hover:border-[#3a7a50] transition">
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#e0b83a] text-[9px] font-bold text-[#132217]">
-              </span>
-            </button>
+  <div style={{ position: "relative" }}>
+    <button
+      onClick={() => {
+        setNotificationsOpen((o) => !o);
+        setProfileOpen(false);
+      }}
+      className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#142a1e] border border-[#2a5438] text-emerald-200 hover:border-[#3a7a50] transition"
+    >
+      <Bell className="h-4 w-4" />
+      {unreadNotifications.length > 0 && (
+        <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#e0b83a] text-[9px] font-bold text-[#132217]">
+          {unreadNotifications.length}
+        </span>
+      )}
+    </button>
+
+    {notificationsOpen && (
+      <div
+        style={{
+          position: "absolute",
+          top: "100%",
+          right: 0,
+          marginTop: 8,
+          width: 320,
+          background: C.bgCard,
+          border: `1px solid ${C.border}`,
+          borderRadius: 16,
+          boxShadow: `0 20px 40px rgba(0,0,0,0.6)`,
+          zIndex: 1000,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: C.greenBright,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+            }}
+          >
+            Notifications
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11, color: C.muted }}>
+            {isAdmin ? "Live valet admin updates" : "Live valet status updates"}
+          </div>
+        </div>
+
+        <div style={{ maxHeight: 320, overflowY: "auto" }}>
+          {unreadNotifications.length === 0 ? (
+            <div style={{ padding: "12px 16px", fontSize: 12, color: C.muted }}>
+              No new notifications.
+            </div>
+          ) : (
+            unreadNotifications.map((note) => (
+              <div
+                key={note.id}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "12px 16px",
+                  borderBottom: `1px solid ${C.border}55`,
+                  fontSize: 12,
+                  color: C.text,
+                }}
+              >
+                <div style={{ flex: 1, lineHeight: 1.5 }}>{note.text}</div>
+
+                <button
+                  onClick={() => dismissNotification(note.id)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: C.muted,
+                    padding: 0,
+                  }}
+                  title="Dismiss notification"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))
           )}
+        </div>
+      </div>
+    )}
+  </div>
+)}
     </div>
 
     <div style={{ position: 'relative', display: 'inline-block' }}>
