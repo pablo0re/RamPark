@@ -5,3 +5,4 @@ pydantic
 python-multipart
 google-cloud-firestore
 requests
+python-dotenv

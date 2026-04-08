@@ -1,32 +1,85 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon, Trash2, MapPin } from 'lucide-react';
+import { getValetRequests } from '@/lib/api';
+import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon, Trash2, MapPin, Car, X } from 'lucide-react';
 
 export default function TopBar() {
   const router = useRouter();
   const [user] = useAuthState(auth);
+  const ADMIN_EMAIL = "orelpm@farmingdale.edu";
+  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [valetRequests, setValetRequests] = useState<any[]>([]);
+  const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
+
+  useEffect(() => {
+    const key = `rampark_dismissed_notifications_${user?.email || 'guest'}`;
+    const saved = localStorage.getItem(key);
+
+    if (saved) {
+      try {
+        setDismissedNotifications(JSON.parse(saved));
+      } catch {
+        setDismissedNotifications([]);
+      }
+    } else {
+      setDismissedNotifications([]);
+    }
+  }, [user?.email]);
+
+  const saveDismissedNotifications = (updated: string[]) => {
+    const key = `rampark_dismissed_notifications_${user?.email || 'guest'}`;
+    setDismissedNotifications(updated);
+    localStorage.setItem(key, JSON.stringify(updated));
+  };
+
+  const dismissNotification = (notificationId: string) => {
+    if (dismissedNotifications.includes(notificationId)) return;
+    saveDismissedNotifications([...dismissedNotifications, notificationId]);
+  };
+
+  const loadValetRequests = async () => {
+    try {
+      const data = await getValetRequests();
+      setValetRequests(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   useEffect(() => {
     const close = () => {
       setSettingsOpen(false);
       setProfileOpen(false);
+      setNotificationsOpen(false);
     };
+
     router.prefetch('/');
-    return () => close();
+    loadValetRequests();
+
+    const interval = setInterval(() => {
+      loadValetRequests();
+    }, 4000);
+
+    return () => {
+      clearInterval(interval);
+      close();
+    };
   }, [router]);
 
   const handleLogout = async () => {
     await signOut(auth);
     setProfileOpen(false);
     setSettingsOpen(false);
+    setNotificationsOpen(false);
     router.push('/');
   };
 
@@ -63,8 +116,114 @@ export default function TopBar() {
   const displayName =
     user?.displayName || user?.email?.split('@')[0] || 'User';
 
+  const allNotifications = useMemo(() => {
+    if (!user?.email) return [];
+
+    let relevantRequests = valetRequests;
+
+    if (!isAdmin) {
+      relevantRequests = valetRequests.filter((item) => {
+        const emailMatch =
+          item.userEmail?.toLowerCase() === user.email?.toLowerCase();
+        const nameMatch =
+          item.studentName?.toLowerCase() ===
+          (user.displayName || '').toLowerCase();
+
+        return emailMatch || nameMatch;
+      });
+    }
+
+    const notifications = relevantRequests.flatMap((item) => {
+      const notes: { id: string; text: string; createdAt: string }[] = [];
+
+      if (isAdmin) {
+        if (item.status === 'pending') {
+          notes.push({
+            id: `${item.id}-pending`,
+            text: `New valet request from ${item.studentName} at ${item.pickupLocation}.`,
+            createdAt: item.createdAt || '',
+          });
+        }
+
+        if (item.status === 'return_requested') {
+          notes.push({
+            id: `${item.id}-return_requested`,
+            text: `${item.studentName} requested the car back at ${item.returnLocation} for ${item.returnTime}.`,
+            createdAt: item.returnRequestedAt || item.createdAt || '',
+          });
+        }
+      } else {
+        if (item.status === 'pending') {
+          notes.push({
+            id: `${item.id}-pending`,
+            text: 'Your valet request is pending review.',
+            createdAt: item.createdAt || '',
+          });
+        } else if (item.status === 'approved') {
+          notes.push({
+            id: `${item.id}-approved`,
+            text: `Your valet request was approved. Assigned valet: ${item.assignedValet || 'Valet assigned'}.`,
+            createdAt: item.approvedAt || item.createdAt || '',
+          });
+        } else if (item.status === 'vehicle_received') {
+          notes.push({
+            id: `${item.id}-vehicle_received`,
+            text: 'Your vehicle has been received by the valet.',
+            createdAt: item.vehicleReceivedAt || item.createdAt || '',
+          });
+        } else if (item.status === 'parked') {
+          notes.push({
+            id: `${item.id}-parked`,
+            text: `Your vehicle is parked${item.assignedLotName ? ` in ${item.assignedLotName}` : ''}.`,
+            createdAt: item.parkedAt || item.createdAt || '',
+          });
+        } else if (item.status === 'return_requested') {
+          notes.push({
+            id: `${item.id}-return_requested`,
+            text: 'Your return request was sent to the valet.',
+            createdAt: item.returnRequestedAt || item.createdAt || '',
+          });
+        } else if (item.status === 'return_in_progress') {
+          notes.push({
+            id: `${item.id}-return_in_progress`,
+            text: 'Your vehicle return is in progress.',
+            createdAt: item.returnInProgressAt || item.createdAt || '',
+          });
+        } else if (item.status === 'completed') {
+          notes.push({
+            id: `${item.id}-completed`,
+            text: 'Your valet request has been completed.',
+            createdAt: item.completedAt || item.createdAt || '',
+          });
+        } else if (item.status === 'cancelled') {
+          notes.push({
+            id: `${item.id}-cancelled`,
+            text: 'Your valet request was cancelled.',
+            createdAt: item.cancelledAt || item.createdAt || '',
+          });
+        } else if (item.status === 'rejected') {
+          notes.push({
+            id: `${item.id}-rejected`,
+            text: 'Your valet request was rejected.',
+            createdAt: item.rejectedAt || item.createdAt || '',
+          });
+        }
+      }
+
+      return notes;
+    });
+
+    return notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [valetRequests, user, isAdmin, displayName]);
+
+  const unreadNotifications = useMemo(() => {
+    return allNotifications.filter(
+      (note) => !dismissedNotifications.includes(note.id)
+    );
+  }, [allNotifications, dismissedNotifications]);
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#2a5438] bg-[#0d2818]/95 backdrop-blur-md">
+    <header className="sticky top-0 z-[100] w-full border-b border-[#2a5438] bg-[#0d2818]/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <button
@@ -89,11 +248,60 @@ export default function TopBar() {
 
         <div className="flex items-center gap-4">
           {user && (
-            <button className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#142a1e] border border-[#2a5438] text-emerald-200 hover:border-[#3a7a50] transition">
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#e0b83a] text-[9px] font-bold text-[#132217]">
-              </span>
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setNotificationsOpen((o) => !o);
+                  setSettingsOpen(false);
+                  setProfileOpen(false);
+                }}
+                className="relative flex h-9 w-9 items-center justify-center rounded-full bg-[#142a1e] border border-[#2a5438] text-emerald-200 hover:border-[#3a7a50] transition"
+              >
+                <Bell className="h-4 w-4" />
+                {unreadNotifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#e0b83a] text-[9px] font-bold text-[#132217]">
+                    {unreadNotifications.length}
+                  </span>
+                )}
+              </button>
+
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#2a5438] bg-[#142a1e] shadow-2xl py-2 z-50">
+                  <div className="px-4 py-3 border-b border-[#2a5438]">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
+                      Notifications
+                    </div>
+                    <div className="mt-1 text-[11px] text-emerald-200/80">
+                      {isAdmin ? 'Live valet admin updates' : 'Live valet status updates'}
+                    </div>
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto">
+                    {unreadNotifications.length === 0 ? (
+                      <div className="px-4 py-3 text-xs text-emerald-200/80">
+                        No new notifications.
+                      </div>
+                    ) : (
+                      unreadNotifications.map((note) => (
+                        <div
+                          key={note.id}
+                          className="flex items-start justify-between gap-3 px-4 py-3 text-xs text-slate-50 border-b border-[#23452f] last:border-b-0"
+                        >
+                          <div className="flex-1">{note.text}</div>
+                          <button
+                            onClick={() => dismissNotification(note.id)}
+                            className="mt-0.5 text-emerald-300 hover:text-white transition"
+                            title="Dismiss notification"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {!user && (
@@ -161,63 +369,75 @@ export default function TopBar() {
         </div>
       </div>
 
-            {settingsOpen && (
-              <div className="absolute left-4 top-16 z-40 w-72 rounded-2xl border border-[#2a5438] bg-[#142a1e] shadow-2xl">
-                <div className="px-4 py-3 border-b border-[#2a5438]">
-                   <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
-                    Settings
-                  </div>
-                <div className="mt-1 text-[11px] text-emerald-200/80">
-                  Manage notifications, history, and account.
-                </div>
-              </div>
-              <div className="py-1">
-                <Link href="/notifications" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
-                <Bell className="h-4 w-4 text-emerald-300" />
-                Notifications
-                </Link>
+      {settingsOpen && (
+        <div className="absolute left-4 top-16 z-[100] w-72 rounded-2xl border border-[#2a5438] bg-[#142a1e] shadow-2xl">
+          <div className="px-4 py-3 border-b border-[#2a5438]">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
+              Settings
+            </div>
+            <div className="mt-1 text-[11px] text-emerald-200/80">
+              Manage notifications, history, and account.
+            </div>
+          </div>
+          <div className="py-1">
+            <Link href="/notifications" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+              <Bell className="h-4 w-4 text-emerald-300" />
+              Notifications
+            </Link>
 
-                <Link href="/history" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
-                <History className="h-4 w-4 text-emerald-300" />
-                Parking history
-                </Link>
+            <Link href="/history" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+              <History className="h-4 w-4 text-emerald-300" />
+              Parking history
+            </Link>
 
-                <Link href="/vehicle-profile" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
-                <UserIcon className="h-4 w-4 text-emerald-300" />
-                Vehicle profile
-                </Link>
+            <Link href="/vehicle-profile" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+              <UserIcon className="h-4 w-4 text-emerald-300" />
+              Vehicle profile
+            </Link>
 
-                <Link href="/favorite-spots" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
-                <MapPin className="h-4 w-4 text-emerald-300" />
-                Favorite spots
-                </Link>
+            <Link href="/favorite-spots" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+              <MapPin className="h-4 w-4 text-emerald-300" />
+              Favorite spots
+            </Link>
 
-                <Link href="/theme-mode" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
-                <Settings className="h-4 w-4 text-emerald-300" />
-                Theme mode
-                </Link>
-                </div>
-              <div className="border-t border-[#2a5438] py-1">
-          {user ? (
-            <button
-            onClick={handleLogout}
-            className="flex w-full items-center gap-3 px-4 py-2 text-xs text-red-300 hover:bg-red-900/40"
-          >
-              <LogOut className="h-4 w-4" />
-              Log out
-            </button>
+            <Link href="/valet" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+              <Car className="h-4 w-4 text-emerald-300" />
+              Campus valet
+            </Link>
+
+            {isAdmin && (
+              <Link href="/admin/valet" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+                <Car className="h-4 w-4 text-emerald-300" />
+                Valet admin
+              </Link>
+            )}
+
+            <Link href="/theme-mode" className="flex w-full items-center gap-3 px-4 py-2 text-xs text-slate-50 hover:bg-[#1a3d28] block">
+              <Settings className="h-4 w-4 text-emerald-300" />
+              Theme mode
+            </Link>
+          </div>
+          <div className="border-t border-[#2a5438] py-1">
+            {user ? (
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-3 px-4 py-2 text-xs text-red-300 hover:bg-red-900/40"
+              >
+                <LogOut className="h-4 w-4" />
+                Log out
+              </button>
             ) : (
               <Link
-              href="/sign-in"
-              className="flex w-full items-center gap-3 px-4 py-2 text-xs text-emerald-200 hover:bg-[#1a3d28]"
-            >
-            <UserIcon className="h-4 w-4 text-emerald-300" />
-              Sign in
-            </Link>
+                href="/sign-in"
+                className="flex w-full items-center gap-3 px-4 py-2 text-xs text-emerald-200 hover:bg-[#1a3d28]"
+              >
+                <UserIcon className="h-4 w-4 text-emerald-300" />
+                Sign in
+              </Link>
             )}
-            </div>
-            </div>
-            )}
-            </header>
-          );
-        }
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
