@@ -198,8 +198,8 @@ export default function HomePage() {
   const [valetRequests, setValetRequests] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
 
-  const ADMIN_EMAIL = "orelpm@farmingdale.edu";
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const ADMIN_EMAILS = ["orelpm@farmingdale.edu", "hamzm@farmingdale.edu"];
+  const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
   useEffect(() => {
     const i = setInterval(() => setPulse(p => !p), 2000);
     return () => clearInterval(i);
@@ -245,7 +245,7 @@ useEffect(() => {
 
   const interval = setInterval(() => {
     loadValetRequests();
-  }, 4000);
+  }, 1800000);
 
   return () => clearInterval(interval);
 }, []);
@@ -443,6 +443,7 @@ const unreadNotifications = useMemo(() => {
       <Link href="/map"><Btn variant="ghost">Map</Btn></Link>
       <Link href="/ai"><Btn variant="ghost">AI Demo</Btn></Link>
       <Link href="/valet"><Btn variant="ghost">Valet</Btn></Link>
+      <Link href="/leaderboard"><Btn variant="ghost">Leaderboard</Btn></Link>
       {user && (
   <div style={{ position: "relative" }}>
     <button

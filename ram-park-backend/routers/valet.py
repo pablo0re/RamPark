@@ -215,9 +215,62 @@ async def complete_valet_request(request_id: str):
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Valet request not found")
 
+    data = doc.to_dict()
+
     doc_ref.update({
         "status": "completed",
         "completedAt": datetime.utcnow().isoformat()
     })
 
+    # --- Update leaderboard count ---
+    user_id = data.get("userId")
+    student_name = data.get("studentName", "Unknown")
+    user_email = data.get("userEmail", "")
+
+    if user_id:
+        lb_ref = db.collection("valet_leaderboard").document(user_id)
+        lb_doc = lb_ref.get()
+
+        if lb_doc.exists:
+            lb_ref.update({
+                "valetCount": lb_doc.to_dict().get("valetCount", 0) + 1,
+                "studentName": student_name,
+                "lastUsed": datetime.utcnow().isoformat()
+            })
+        else:
+            lb_ref.set({
+                "userId": user_id,
+                "studentName": student_name,
+                "userEmail": user_email,
+                "valetCount": 1,
+                "lastUsed": datetime.utcnow().isoformat()
+            })
+
     return {"message": "Valet request completed"}
+
+
+@router.get("/leaderboard")
+async def get_valet_leaderboard():
+    """
+    Returns top 10 users by valet usage count.
+    """
+    docs = db.collection("valet_leaderboard").stream()
+
+    entries = []
+    for doc in docs:
+        data = doc.to_dict()
+        entries.append({
+            "userId": data.get("userId"),
+            "studentName": data.get("studentName", "Unknown"),
+            "valetCount": data.get("valetCount", 0),
+            "lastUsed": data.get("lastUsed")
+        })
+
+    # Sort by valetCount descending, take top 10
+    top10 = sorted(entries, key=lambda x: x["valetCount"], reverse=True)[:10]
+
+    # Add rank
+    for i, entry in enumerate(top10):
+        entry["rank"] = i + 1
+
+    return top10

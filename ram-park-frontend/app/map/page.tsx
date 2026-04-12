@@ -275,6 +275,21 @@ export default function MapPage() {
                       title={`${lot.name}\n${lot.predictedOccupancy}% occupied`}
                     />
                   ))}
+                  {userPos && (
+                    <Marker
+                      position={userPos}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: '#4285F4',
+                        fillOpacity: 1,
+                        strokeWeight: 3,
+                        strokeColor: '#FFFFFF',
+                        strokeOpacity: 1,
+                      }}
+                      title="You are here"
+                    />
+                  )}
                 </GoogleMap>
               )}
             </CardContent>

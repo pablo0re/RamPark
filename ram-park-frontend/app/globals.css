@@ -1,13 +1,18 @@
 @import "tailwindcss";
 
 html, body {
-  background-color: #0d2818 !important;
+  background-color: #0d2818;
 }
 
+/* Font size classes applied globally */
+html[data-fontsize="medium"] { font-size: 15px !important; }
+html[data-fontsize="small"] * { font-size: 0.97em !important; }
+html[data-fontsize="large"] * { font-size: 1.03em !important; }
+
+
+
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .animate-spin {
@@ -15,16 +20,7 @@ html, body {
   border-top-color: transparent !important;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0d2818;
-}
-::-webkit-scrollbar-thumb {
-  background: #2a5438;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3a7a50;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0d2818; }
+::-webkit-scrollbar-thumb { background: #2a5438; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a7a50; }

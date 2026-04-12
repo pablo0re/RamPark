@@ -4,7 +4,6 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import NavBar from '@/components/NavBar';
 
-
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
@@ -12,14 +11,20 @@ export const metadata: Metadata = {
   description: 'FSC Smart Parking',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="bg-[#0d2818] text-slate-50" suppressHydrationWarning>
-      <body className={`${inter.className} bg-[#0d2818] text-slate-50`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var fontSize = localStorage.getItem('rp_fontSize') || 'medium';
+              document.documentElement.setAttribute('data-fontsize', fontSize);
+            } catch(e) {}
+          })();
+        `}} />
+      </head>
+      <body className={inter.className + " bg-[#0d2818] text-slate-50"}>
         <AuthProvider>
           <div className="min-h-screen flex flex-col">
             <NavBar />
