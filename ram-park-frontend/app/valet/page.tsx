@@ -24,7 +24,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-const ADMIN_EMAIL = "orelpm@farmingdale.edu";
+const ADMIN_EMAILS = ["orelpm@farmingdale.edu", "hamzm@farmingdale.edu"];
 
 function formatStatus(status: string) {
   return status
@@ -51,7 +51,7 @@ export default function ValetPage() {
 
   const [returnForms, setReturnForms] = useState<Record<string, { returnLocation: string; returnTime: string; returnMessage: string }>>({});
 
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
 
   async function loadRequests() {
     try {

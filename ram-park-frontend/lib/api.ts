@@ -169,3 +169,33 @@ export async function completeValetRequest(requestId: string) {
   if (!res.ok) throw new Error("Failed to complete valet request");
   return res.json();
 }
+export async function getValetLeaderboard() {
+  const res = await fetch(`${API_BASE}/valet/leaderboard`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch leaderboard");
+  return res.json();
+}
+
+export async function getRecommendations(token: string) {
+  const res = await fetch(`${API_BASE}/recommend/suggest`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json"
+    },
+    cache: "no-store"
+  });
+  if (!res.ok) throw new Error("Failed to get recommendations");
+  return res.json();
+}
+
+export async function saveScheduleToFirestore(
+  userId: string,
+  classes: any[],
+  db: any
+) {
+  const { doc, setDoc, collection } = await import("firebase/firestore");
+  for (const cls of classes) {
+    const ref = doc(collection(db, "schedules", userId, "classes"), cls.id);
+    await setDoc(ref, cls);
+  }
+}

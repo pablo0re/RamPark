@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { ShieldCheck, Phone, MapPin, CarFront } from "lucide-react";
 
-const ADMIN_EMAIL = "orelpm@farmingdale.edu";
+const ADMIN_EMAILS = ["orelpm@farmingdale.edu", "hamzm@farmingdale.edu"];
 function formatStatus(status: string) {
   return status
     .split("_")
@@ -30,7 +30,7 @@ export default function AdminValetPage() {
   const [message, setMessage] = useState("");
   const [approvalForms, setApprovalForms] = useState<Record<string, { valetName: string; valetPhone: string }>>({});
   const [parkedForms, setParkedForms] = useState<Record<string, { assignedLotName: string }>>({});
-  const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
 
   async function loadRequests() {
     try {

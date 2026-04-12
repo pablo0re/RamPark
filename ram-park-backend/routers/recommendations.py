@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from firebase_config import db
 from auth import verify_token
 from datetime import datetime
-import requests, math, json, os
+import requests, math, json, os, base64
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,7 +10,6 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
 router = APIRouter()
 
-#measuring distance between two points on a sphere, using their latitude and longitude points 
 def haversine_m(lat1, lon1, lat2, lon2):
     R = 6371000
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
@@ -20,7 +19,6 @@ def haversine_m(lat1, lon1, lat2, lon2):
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
 def get_building_coords(building_name: str):
-    """Read building lat/lng directly from your Firestore buildings collection."""
     doc = db.collection("buildings").document(building_name).get()
     if not doc.exists:
         return None
@@ -28,7 +26,6 @@ def get_building_coords(building_name: str):
     return {"lat": data["lat"], "lng": data["lng"]}
 
 def get_weather():
-    """Free weather from Open-Meteo — no API key needed."""
     try:
         res = requests.get(
             "https://api.open-meteo.com/v1/forecast"
@@ -47,14 +44,9 @@ def get_weather():
             "precip_chance": precip
         }
     except Exception:
-        return None  # never crash the main request over weather
+        return None
 
 def count_crowd(building: str, start_time: str, today: str) -> int:
-    """
-    Count users who have class in the same building today.
-    More users = more competition for the closest lot.
-    Uses collection_group to query across all users' subcollections.
-    """
     try:
         docs = db.collection_group("classes") \
                  .where("building", "==", building) \
@@ -63,23 +55,20 @@ def count_crowd(building: str, start_time: str, today: str) -> int:
         count = 0
         for doc in docs:
             d = doc.to_dict()
-            # Count if their class overlaps — starts before or at the same time
             if d.get("startTime", "99:99") <= start_time:
                 count += 1
         return count
     except Exception:
-        return 0  # collection_group requires a Firestore index — fails gracefully if missing
-    
-    
-@router.post("/suggest")
+        return 0
 
+
+@router.post("/suggest")
 async def suggest_lots(user=Depends(verify_token)):
     user_id = user["uid"]
     now     = datetime.now()
-    today   = now.strftime("%a")           # "Mon", "Tue", etc.
+    today   = now.strftime("%a")
     current_time = now.strftime("%H:%M")
 
-    # --- Get user's classes scheduled for today ---
     classes_ref = db.collection("schedules").document(user_id) \
                     .collection("classes") \
                     .where("days", "array_contains", today) \
@@ -89,58 +78,48 @@ async def suggest_lots(user=Depends(verify_token)):
     if not classes_today:
         return {"message": "No classes today", "recommendations": []}
 
-    # Sort by start time, use first class as the destination
     classes_today.sort(key=lambda x: x["startTime"])
     first_class   = classes_today[0]
     building_name = first_class["building"]
 
-    # --- Look up building coordinates from Firestore ---
     building = get_building_coords(building_name)
     if not building:
         raise HTTPException(status_code=404, detail=f"Building '{building_name}' not in Firestore")
 
-    # --- Load all lots ---
     lot_docs = db.collection("lots").stream()
     lots = []
     for doc in lot_docs:
         d      = doc.to_dict()
         d["id"] = doc.id
 
-        # Skip lots missing coordinates
         if "lat" not in d or "lng" not in d:
             continue
 
-        dist     = haversine_m(building["lat"], building["lng"], d["lat"], d["lng"])
+        dist      = haversine_m(building["lat"], building["lng"], d["lat"], d["lng"])
         predicted = d.get("predictedOccupancy", 0)
         live      = d.get("liveOccupancyPercent", 0)
-
-        # Blend live check-ins with schedule prediction
-        # If we have live data use it more heavily, else rely on schedule
-        blended = int(round(0.4 * predicted + 0.6 * live)) if live > 0 else predicted
+        blended   = int(round(0.4 * predicted + 0.6 * live)) if live > 0 else predicted
 
         lots.append({
-            "id":               d["id"],
-            "name":             d.get("name", d["id"]),
-            "type":             d.get("type", "student"),
-            "distance_m":       round(dist),
+            "id":                d["id"],
+            "name":              d.get("name", d["id"]),
+            "type":              d.get("type", "student"),
+            "distance_m":        round(dist),
             "occupancy_percent": blended,
-            "capacity":         d.get("totalCapacity", 0),
+            "capacity":          d.get("totalCapacity", 0),
         })
 
-    # --- Gather context ---
-    weather  = get_weather()
-    crowd    = count_crowd(building_name, first_class["startTime"], today)
+    weather = get_weather()
+    crowd   = count_crowd(building_name, first_class["startTime"], today)
 
-    # Minutes until class starts — time pressure signal
     try:
         h, m = map(int, first_class["startTime"].split(":"))
         class_start_mins = h * 60 + m
         now_mins         = now.hour * 60 + now.minute
         mins_until_class = class_start_mins - now_mins
     except Exception:
-        mins_until_class = 60  # safe default
+        mins_until_class = 60
 
-    # --- Build prompt for Claude ---
     prompt = f"""
 You are a smart parking assistant for Farmingdale State College (FSC) on Long Island, NY.
 
@@ -188,7 +167,6 @@ No markdown. No explanation. Raw JSON array only.
         )
         ranked = json.loads(resp.json()["content"][0]["text"])
     except Exception:
-        # Fallback: sort by distance if Claude call fails
         ranked = [
             {
                 "id": l["id"],
@@ -199,7 +177,6 @@ No markdown. No explanation. Raw JSON array only.
             for i, l in enumerate(sorted(lots, key=lambda x: x["distance_m"])[:3])
         ]
 
-    # Attach full lot data to each ranked result for the frontend
     lot_map = {l["id"]: l for l in lots}
     results = []
     for r in ranked:
@@ -214,3 +191,66 @@ No markdown. No explanation. Raw JSON array only.
         "minsUntilClass":  mins_until_class,
         "recommendations": results
     }
+
+
+@router.post("/extract-schedule")
+async def extract_schedule_from_pdf(file: UploadFile = File(...)):
+    """
+    Accepts a PDF or image, sends to Claude, returns extracted schedule as JSON.
+    """
+    content = await file.read()
+    b64 = base64.b64encode(content).decode("utf-8")
+
+    is_pdf = file.content_type == "application/pdf" or (file.filename or "").endswith(".pdf")
+    media_type = "application/pdf" if is_pdf else (file.content_type or "image/jpeg")
+    doc_type = "document" if is_pdf else "image"
+
+    resp = requests.post(
+        "https://api.anthropic.com/v1/messages",
+        headers={
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        },
+        json={
+            "model": "claude-sonnet-4-20250514",
+            "max_tokens": 1500,
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {
+                        "type": doc_type,
+                        "source": {"type": "base64", "media_type": media_type, "data": b64}
+                    },
+                    {
+                        "type": "text",
+                        "text": """Extract the class schedule. Return ONLY a valid JSON array. Each object must have:
+- "id": unique string like "pdf-1", "pdf-2"
+- "course": course code and name e.g. "BCS 300 · Management Information Systems"
+- "building": building name only e.g. "Whitman Hall"
+- "room": room number as string
+- "startTime": 24-hour format "HH:MM"
+- "endTime": 24-hour format "HH:MM"
+- "days": array using ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+Skip online courses. No markdown. Raw JSON array only."""
+                    }
+                ]
+            }]
+        },
+        timeout=30
+    )
+
+    resp_json = resp.json()
+    
+    # Check for API errors
+    print("ANTHROPIC RESPONSE:", resp_json)  # debug
+    
+    if "error" in resp_json:
+        raise HTTPException(status_code=500, detail=f"Anthropic API error: {resp_json['error']}")
+    
+    if "content" not in resp_json:
+        raise HTTPException(status_code=500, detail=f"Unexpected response: {str(resp_json)}")
+    
+    raw = resp_json["content"][0]["text"]
+    classes = json.loads(raw.replace("```json", "").replace("```", "").strip())
+    return {"classes": classes}
