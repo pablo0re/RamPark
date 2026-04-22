@@ -10,15 +10,20 @@ async def get_all_lots():
     lots = []
     for lot in lots_ref:
         data = lot.to_dict()
-        # Logic for occupancy color
+        data["id"] = lot.id
         occ = data.get("predictedOccupancy", 0)
+
         color = "green"
-        if occ > 75: color = "red"
-        elif occ > 50: color = "orange"
-        elif occ > 25: color = "yellow"
-        
+        if occ > 75:
+            color = "red"
+        elif occ > 50:
+            color = "orange"
+        elif occ > 25:
+            color = "yellow"
+
         data["occupancyColor"] = color
         lots.append(data)
+
     return lots
 
 @router.get("/lots/{lot_id}/spots")

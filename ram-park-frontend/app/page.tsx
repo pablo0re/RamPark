@@ -763,9 +763,9 @@ const unreadNotifications = useMemo(() => {
             </div>
 
             <div style={{ display:"flex", gap:32, paddingTop:16, borderTop:`1px solid ${C.border}55` }}>
-              <Stat value="2"   label="Lots"    />
+              <Stat value="21"   label="Lots"    />
               <div style={{ width:1, background:C.border }} />
-              <Stat value="97"  label="Spots"   />
+              <Stat value="990"  label="Spots"   />
               <div style={{ width:1, background:C.border }} />
               <Stat value="<1m" label="Refresh" />
             </div>
