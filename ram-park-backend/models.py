@@ -23,6 +23,10 @@ class ParkingLot(BaseModel):
     totalCapacity: int
     predictedOccupancy: int
     occupancyColor: str
+    photoOccupancy: Optional[int] = None
+    hasEvChargers: Optional[bool] = False
+    evChargersTotal: Optional[int] = 0
+    evChargersAvailable: Optional[int] = 0
 
 
 class RecommendationRequest(BaseModel):

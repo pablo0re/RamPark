@@ -21,7 +21,7 @@ export default function FavoriteSpotsPage() {
   const mockLots = [
     { id: 'lot15', name: 'Lot 15 - Student', spots: 51 },
     { id: 'lot15a', name: 'Lot 15A - Staff', spots: 46 },
-    { id: 'lot18', name: 'Lot 18 - Student', spots: 120 },
+    { id: 'lot18', name: 'Lot 18 - Student', spots: 44 },
      { id: 'lot20', name: 'Lot 20 - Visitor', spots: 32 },
 
     { id: 'slot1', name: 'Student Lot #1', spots: 51 },
@@ -31,19 +31,19 @@ export default function FavoriteSpotsPage() {
 
     { id: 'slot5', name: 'Student Lot #5', spots: 51 },
     { id: 'slot5a', name: 'Student Lot #5a', spots: 46 },
-    { id: 'slot6', name: 'Student Lot #6', spots: 100 },
+    { id: 'slot6', name: 'Student Lot #6', spots: 53 },
     { id: 'slot7', name: 'Student Lot #7', spots: 39 },
 
     { id: 'spl9', name: 'Student Parking Lot #9', spots: 60 },
     { id: 'pls1', name: 'Parking Lot Staff', spots: 49 },
-    { id: 'pls2', name: 'Parking Lot Staff #2', spots: 101 },
+    { id: 'pls2', name: 'Parking Lot Staff #2', spots: 50 },
     { id: 'pls4a', name: 'Parking Lot Staff #4a', spots: 40 },
 
     { id: 'pls7a', name: 'Parking Lot Staff #7a', spots: 67 },
     { id: 'rsl10', name: 'Resident Student Lot #10', spots: 47 },
     { id: 'rsl11', name: 'Resident Student Lot #11', spots: 35 },
-    { id: 'stpl12', name: 'Staff Parking Lot #12', spots: 99 },
-    { id: 'stpl18', name: 'Staff Parking Lot #8', spots: 45 },
+    { id: 'stpl12', name: 'Staff Parking Lot #12', spots: 43 },
+    { id: 'stpl8', name: 'Staff Parking Lot #8', spots: 45 },
   ];
 
   useEffect(() => {

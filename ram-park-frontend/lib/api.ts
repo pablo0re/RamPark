@@ -15,6 +15,9 @@ export interface ParkingLot {
   predictedOccupancy: number;
   occupancyColor: "green" | "yellow" | "orange" | "red";
   photoOccupancy?: number;
+  hasEvChargers?: boolean;
+  evChargersTotal?: number;
+  evChargersAvailable?: number;
 }
 
 export interface ValetRequestPayload {
