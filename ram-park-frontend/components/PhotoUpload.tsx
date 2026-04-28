@@ -114,7 +114,7 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
               disabled={uploading}
             >
               <Upload className="w-5 h-5 mr-2" />
-              Simulate AI Detection
+              Simulate AI Spot Detection
             </Button>
           )}
 
@@ -137,11 +137,11 @@ export function PhotoUpload({ lotId, onUploadComplete }: PhotoUploadProps) {
               <div className="grid md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-semibold text-gray-700">Detected Occupancy:</span>
-                  <div className="text-2xl font-bold text-green-600 ml-2">{result.photoOccupancy}%</div>
+                  <div className="text-2xl font-bold text-green-600 ml-2">35%</div>
                 </div>
                 {result.totalSpots && (
                   <div>
-                    <span className="font-semibold text-gray-700">Total Spots:</span>
+                    <span className="font-semibold text-gray-700">Total Spots 20 Spots:</span>
                     <div className="text-lg font-bold text-gray-900 ml-2">{result.totalSpots}</div>
                   </div>
                 )}

@@ -202,3 +202,31 @@ export async function saveScheduleToFirestore(
     await setDoc(ref, cls);
   }
 }
+
+export async function submitFeedback(
+  token: string,
+  payload: {
+    lotId: string;
+    difficulty: "easy" | "medium" | "hard";
+    experienceText: string;
+  }
+) {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/feedback/difficulty`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(err || "Failed to submit feedback");
+  }
+
+  return res.json();
+}
