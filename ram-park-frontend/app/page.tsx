@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getValetRequests } from "@/lib/api";
-import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap, Bell, Car, X } from "lucide-react";
+import { ArrowRight, Users, Camera, Clock, Shield, MapPin, ChevronRight, Zap, Bell, Car, X, MessageSquare } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -260,7 +260,7 @@ useEffect(() => {
   },
   {
     icon: Camera,
-    title: "AI Photo Detection",
+    title: "AI Spot Detection",
     desc: "Computer vision scans lot images to detect open spots automatically.",
     iconBg: "#0f1f3d",
     href: "/ai",
@@ -285,7 +285,14 @@ useEffect(() => {
   desc: "Request a valet during busy campus hours and drop off near your class.",
   iconBg: "#1f3d0f",
   href: "/valet",
-},
+  },
+  {
+  icon: MessageSquare,
+  title: "Parking Feedback",
+  desc: "Tell us how easy or hard it was to park.",
+  iconBg: "#1f3d0f",
+  href: "/feedback",
+  },
 ];
 
   const steps: StepProps[] = [
@@ -441,7 +448,7 @@ const unreadNotifications = useMemo(() => {
       <Link href="/status"><Btn variant="ghost">Status</Btn></Link>
       <Link href="/schedule"><Btn variant="ghost">Schedule</Btn></Link>
       <Link href="/map"><Btn variant="ghost">Map</Btn></Link>
-      <Link href="/ai"><Btn variant="ghost">AI Demo</Btn></Link>
+      <Link href="/ai"><Btn variant="ghost">AI Spot Detection</Btn></Link>
       <Link href="/valet"><Btn variant="ghost">Valet</Btn></Link>
       <Link href="/leaderboard"><Btn variant="ghost">Leaderboard</Btn></Link>
       {user && (
@@ -757,7 +764,7 @@ const unreadNotifications = useMemo(() => {
             </Link>
             <Link href="/ai">
             <Btn variant="secondary" size="lg">
-            <Zap size={15} color={C.gold} /> Try AI Demo
+            <Zap size={15} color={C.gold} /> Try AI Spot Detection
             </Btn>
             </Link>
             </div>

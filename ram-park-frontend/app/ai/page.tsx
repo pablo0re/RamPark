@@ -9,13 +9,13 @@ export default function AIPage() {
       <div className="max-w-4xl mx-auto px-6 py-12 space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-[#e0b83a] to-[#c9a227] bg-clip-text text-transparent mb-4">
-            AI Photo Simulation
+            AI Spot Detection
           </h1>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto">
-            Upload photos of Lot 15 or Lot 15A to simulate AI spot detection and get instant occupancy updates.
+            Upload photos of Parking Lots to simulate AI spot detection and get instant occupancy updates.
           </p>
         </div>
-
+        
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <Card className="shadow-xl bg-[#142a1e] border-[#2a5438]">
             <CardHeader>
@@ -44,7 +44,7 @@ export default function AIPage() {
                 </div>
                 <div className="flex items-center justify-between p-4 bg-[#1a3d28] rounded-xl">
                   <span className="font-medium">Lot 15A (Staff)</span>
-                  <span className="text-orange-400 font-bold">46 spots</span>
+                  <span className="text-green-400 font-bold">46 spots</span>
                 </div>
               </CardContent>
             </Card>
@@ -54,7 +54,7 @@ export default function AIPage() {
                 <CardTitle>How It Works</CardTitle>
               </CardHeader>
               <CardContent>
-                <ol className="space-y-2 text-sm text-slate-300 list-decimal list-inside">
+                <ol className="space-y-2 text-lg text-slate-300 list-decimal list-inside">
                   <li>Upload photo → Saved to Firebase Storage</li>
                   <li>AI simulates spot detection</li>
                   <li>Updates photoOccupancy% in real-time</li>
