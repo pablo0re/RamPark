@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import {
   requestValet,
   getValetRequests,
@@ -53,6 +54,31 @@ export default function ValetPage() {
 
   const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
 
+  // Load vehicle profile and pre-fill notes
+  useEffect(() => {
+    const loadVehicle = async () => {
+      if (!user) return;
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const vehicles = data.vehicles || [];
+          const idx = data.selectedVehicleIndex ?? 0;
+          const v = vehicles[idx];
+          if (v) {
+            setForm(prev => ({
+              ...prev,
+              notes: `${v.color} ${v.make} ${v.model}`.trim()
+            }));
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load vehicle:", e);
+      }
+    };
+    loadVehicle();
+  }, [user]);
+
   async function loadRequests() {
     try {
       const data = await getValetRequests();
@@ -67,50 +93,34 @@ export default function ValetPage() {
   }, []);
 
   const myRequests = useMemo(() => {
-  let filtered = requests;
-
-  if (user?.email) {
-    filtered = requests.filter((item) => {
-      const emailMatch =
-        item.userEmail?.toLowerCase() === user.email?.toLowerCase();
-      const nameMatch =
-        item.studentName?.toLowerCase() ===
-        (user.displayName || "").toLowerCase();
-      return emailMatch || nameMatch;
+    let filtered = requests;
+    if (user?.email) {
+      filtered = requests.filter((item) => {
+        const emailMatch = item.userEmail?.toLowerCase() === user.email?.toLowerCase();
+        const nameMatch = item.studentName?.toLowerCase() === (user.displayName || "").toLowerCase();
+        return emailMatch || nameMatch;
+      });
+    }
+    return [...filtered].sort((a, b) => {
+      const aDate = a.createdAt || "";
+      const bDate = b.createdAt || "";
+      return bDate.localeCompare(aDate);
     });
-  }
-
-  return [...filtered].sort((a, b) => {
-    const aDate = a.createdAt || "";
-    const bDate = b.createdAt || "";
-    return bDate.localeCompare(aDate);
-  });
-}, [requests, user]);
+  }, [requests, user]);
 
   const handleSubmit = async () => {
-    if (
-      !form.studentName ||
-      !form.phoneNumber ||
-      !form.pickupLocation ||
-      !form.requestedTime
-    ) {
+    if (!form.studentName || !form.phoneNumber || !form.pickupLocation || !form.requestedTime) {
       setMessage("Please fill out all required fields.");
       return;
     }
-
     try {
       setLoading(true);
-
       const result = await requestValet({
         ...form,
         userId: user?.uid || "demo-user-1",
         userEmail: user?.email || "",
       });
-
-      setMessage(
-        `Valet request submitted. Status: ${result.status}. Service fee: $${result.serviceFee}.`
-      );
-
+      setMessage(`Valet request submitted. Status: ${result.status}. Service fee: $${result.serviceFee}.`);
       setForm({
         userId: "demo-user-1",
         studentName: "",
@@ -119,13 +129,10 @@ export default function ValetPage() {
         requestedTime: "",
         notes: "",
       });
-
       loadRequests();
     } catch (error) {
       console.error(error);
-      setMessage(
-        "Failed to submit valet request. Make sure the backend and Firebase are running."
-      );
+      setMessage("Failed to submit valet request. Make sure the backend and Firebase are running.");
     } finally {
       setLoading(false);
     }
@@ -160,12 +167,10 @@ export default function ValetPage() {
 
   const handleRequestReturn = async (id: string) => {
     const form = returnForms[id];
-
     if (!form?.returnLocation || !form?.returnTime) {
       setMessage("Please enter the return location and return time.");
       return;
     }
-
     try {
       await requestVehicleReturn(id, form);
       setMessage("Vehicle return requested successfully.");
@@ -177,30 +182,10 @@ export default function ValetPage() {
   };
 
   const shortcutCards = [
-    {
-      title: "Request Valet",
-      description: "Submit a valet request for campus drop-off service.",
-      icon: Car,
-      href: "#request-form",
-    },
-    {
-      title: "Track Status",
-      description: "Follow your valet request from approval to parked and return.",
-      icon: Clock3,
-      href: "#request-status",
-    },
-    {
-      title: "Request Car Back",
-      description: "Ask for your vehicle to be returned to a location at a specific time.",
-      icon: RotateCcw,
-      href: "#request-status",
-    },
-    {
-      title: "Payment Info",
-      description: "$5 per request. For now, pay at drop-off.",
-      icon: DollarSign,
-      href: "#payment-info",
-    },
+    { title: "Request Valet", description: "Submit a valet request for campus drop-off service.", icon: Car, href: "#request-form" },
+    { title: "Track Status", description: "Follow your valet request from approval to parked and return.", icon: Clock3, href: "#request-status" },
+    { title: "Request Car Back", description: "Ask for your vehicle to be returned to a location at a specific time.", icon: RotateCcw, href: "#request-status" },
+    { title: "Payment Info", description: "$5 per request. For now, pay at drop-off.", icon: DollarSign, href: "#payment-info" },
   ];
 
   return (
@@ -212,13 +197,9 @@ export default function ValetPage() {
             RamPark valet lets you hand off your vehicle at a campus pickup location,
             track its status, and later request it back when you are ready to leave.
           </p>
-
           {isAdmin && (
             <div className="pt-2">
-              <Link
-                href="/admin/valet"
-                className="inline-block px-4 py-2 rounded-xl bg-[#163720] text-white text-sm font-medium hover:bg-[#0f2616] transition"
-              >
+              <Link href="/admin/valet" className="inline-block px-4 py-2 rounded-xl bg-[#163720] text-white text-sm font-medium hover:bg-[#0f2616] transition">
                 Go to Admin Valet Dashboard
               </Link>
             </div>
@@ -229,11 +210,7 @@ export default function ValetPage() {
           {shortcutCards.map((card, index) => {
             const Icon = card.icon;
             return (
-              <a
-                key={index}
-                href={card.href}
-                className="rounded-2xl border border-gray-200 bg-white shadow-lg hover:shadow-xl transition-all duration-300 p-5"
-              >
+              <a key={index} href={card.href} className="rounded-2xl border border-gray-200 bg-white shadow-lg hover:shadow-xl transition-all duration-300 p-5">
                 <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center mb-3">
                   <Icon className="w-6 h-6 text-green-700" />
                 </div>
@@ -244,32 +221,24 @@ export default function ValetPage() {
           })}
         </div>
 
-        <section
-          id="payment-info"
-          className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6"
-        >
+        <section id="payment-info" className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6">
           <div className="flex items-center gap-2 text-green-700 text-xl font-semibold mb-4">
-            <DollarSign className="w-5 h-5" />
-            Pricing & Payment
+            <DollarSign className="w-5 h-5" /> Pricing & Payment
           </div>
           <div className="space-y-2 text-gray-700">
             <p><span className="font-semibold">Valet Fee:</span> $5 per request</p>
-            <p>
-              <span className="font-semibold">Payment:</span> Online payment is coming soon.
-              For now, pay with cash, Zelle, or Venmo when you drop off your car.
-            </p>
+            <p><span className="font-semibold">Payment:</span> Online payment is coming soon. For now, pay with cash, Zelle, or Venmo when you drop off your car.</p>
           </div>
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6">
           <div className="flex items-center gap-2 text-blue-700 text-xl font-semibold mb-4">
-            <CheckCircle2 className="w-5 h-5" />
-            How This Works
+            <CheckCircle2 className="w-5 h-5" /> How This Works
           </div>
           <div className="space-y-3 text-gray-700">
             <p>1. Enter your pickup location, phone number, and requested drop-off time.</p>
             <p>2. Submit the valet request and wait for approval.</p>
-            <p>3. Once approved, you will see the valet’s name, phone number, and assigned parking lot.</p>
+            <p>3. Once approved, you will see the valet's name, phone number, and assigned parking lot.</p>
             <p>4. After the valet parks your car, the status will update to parked.</p>
             <p>5. When you want your car back, submit a return request with where and when you want it delivered.</p>
             <p>6. The valet then returns the vehicle and the request is completed.</p>
@@ -278,23 +247,18 @@ export default function ValetPage() {
 
         <section className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6">
           <div className="flex items-center gap-2 text-purple-700 text-xl font-semibold mb-4">
-            <Phone className="w-5 h-5" />
-            Keys & Contact
+            <Phone className="w-5 h-5" /> Keys & Contact
           </div>
           <div className="space-y-3 text-gray-700">
             <p>The student gives the keys to the valet in person at the pickup location.</p>
-            <p>Once the request is approved, the student can see the assigned valet’s name and phone number.</p>
+            <p>Once the request is approved, the student can see the assigned valet's name and phone number.</p>
             <p>When the student is ready to leave, they can request the car back and choose the return location and time.</p>
           </div>
         </section>
 
-        <section
-          id="request-form"
-          className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6"
-        >
+        <section id="request-form" className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6">
           <div className="flex items-center gap-2 text-green-700 text-xl font-semibold mb-4">
-            <UserRound className="w-5 h-5" />
-            Request Valet
+            <UserRound className="w-5 h-5" /> Request Valet
           </div>
 
           <div className="space-y-4">
@@ -304,21 +268,18 @@ export default function ValetPage() {
               value={form.studentName}
               onChange={(e) => setForm({ ...form, studentName: e.target.value })}
             />
-
             <input
               className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
               placeholder="Phone Number"
               value={form.phoneNumber}
               onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
             />
-
             <input
               className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
               placeholder="Pickup / Drop-off Location"
               value={form.pickupLocation}
               onChange={(e) => setForm({ ...form, pickupLocation: e.target.value })}
             />
-
             <input
               className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
               type="datetime-local"
@@ -326,142 +287,85 @@ export default function ValetPage() {
               onChange={(e) => setForm({ ...form, requestedTime: e.target.value })}
             />
 
-            <textarea
-              className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
-              placeholder="Notes (optional)"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
+            {/* Notes field — pre-filled with vehicle profile */}
+            <div>
+              <textarea
+                className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
+                placeholder="Notes (optional) — your vehicle info will appear here if you have a vehicle profile"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              />
+              {form.notes && (
+                <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                  <Car className="w-3 h-3" />
+                  Vehicle from your profile — you can edit this if needed
+                </p>
+              )}
+            </div>
 
             <Button onClick={handleSubmit} className="w-full" disabled={loading}>
               {loading ? "Submitting..." : "Request Valet"}
             </Button>
 
-            {message && (
-              <p className="text-sm font-medium text-green-700">{message}</p>
-            )}
+            {message && <p className="text-sm font-medium text-green-700">{message}</p>}
           </div>
         </section>
 
-        <section
-          id="request-status"
-          className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6"
-        >
+        <section id="request-status" className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6">
           <div className="flex items-center gap-2 text-[#163720] text-xl font-semibold mb-4">
-            <MapPin className="w-5 h-5" />
-            My Valet Requests
+            <MapPin className="w-5 h-5" /> My Valet Requests
           </div>
-
           <div className="space-y-4">
             {myRequests.length === 0 ? (
               <p className="text-gray-500">No valet requests yet.</p>
             ) : (
               myRequests.map((item) => (
-                <div
-                  key={item.id}
-                  className="border border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-2"
-                >
+                <div key={item.id} className="border border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-2">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                     <p className="font-semibold text-lg">{item.studentName}</p>
-                    <p className="text-sm font-medium text-blue-700 capitalize">
-                      {formatStatus(item.status)}
-                    </p>
+                    <p className="text-sm font-medium text-blue-700 capitalize">{formatStatus(item.status)}</p>
                   </div>
-
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Phone:</span> {item.phoneNumber}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Pickup Location:</span> {item.pickupLocation}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Requested Time:</span> {item.requestedTime}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Fee:</span> ${item.serviceFee || 5}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Payment:</span> {item.paymentNote}
-                  </p>
-
-                  {item.assignedValet && (
-                    <p className="text-sm text-green-700">
-                      <span className="font-semibold">Assigned Valet:</span> {item.assignedValet}
-                    </p>
-                  )}
-
-                  {item.assignedValetPhone && (
-                    <p className="text-sm text-green-700">
-                      <span className="font-semibold">Valet Phone:</span> {item.assignedValetPhone}
-                    </p>
-                  )}
-
-                  {item.assignedLotName && (
-                    <p className="text-sm text-green-700">
-                      <span className="font-semibold">Assigned Parking Lot:</span> {item.assignedLotName}
-                    </p>
-                  )}
-
-                  {item.returnLocation && (
-                    <p className="text-sm text-orange-700">
-                      <span className="font-semibold">Return Location:</span> {item.returnLocation}
-                    </p>
-                  )}
-
-                  {item.returnTime && (
-                    <p className="text-sm text-orange-700">
-                      <span className="font-semibold">Return Time:</span> {item.returnTime}
-                    </p>
-                  )}
-
-                  {item.returnMessage && (
-                    <p className="text-sm text-orange-700">
-                      <span className="font-semibold">Return Message:</span> {item.returnMessage}
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-700"><span className="font-semibold">Phone:</span> {item.phoneNumber}</p>
+                  <p className="text-sm text-gray-700"><span className="font-semibold">Pickup Location:</span> {item.pickupLocation}</p>
+                  <p className="text-sm text-gray-700"><span className="font-semibold">Requested Time:</span> {item.requestedTime}</p>
+                  <p className="text-sm text-gray-700"><span className="font-semibold">Fee:</span> ${item.serviceFee || 5}</p>
+                  <p className="text-sm text-gray-700"><span className="font-semibold">Payment:</span> {item.paymentNote}</p>
+                  {item.notes && <p className="text-sm text-gray-700"><span className="font-semibold">Vehicle:</span> {item.notes}</p>}
+                  {item.assignedValet && <p className="text-sm text-green-700"><span className="font-semibold">Assigned Valet:</span> {item.assignedValet}</p>}
+                  {item.assignedValetPhone && <p className="text-sm text-green-700"><span className="font-semibold">Valet Phone:</span> {item.assignedValetPhone}</p>}
+                  {item.assignedLotName && <p className="text-sm text-green-700"><span className="font-semibold">Assigned Parking Lot:</span> {item.assignedLotName}</p>}
+                  {item.returnLocation && <p className="text-sm text-orange-700"><span className="font-semibold">Return Location:</span> {item.returnLocation}</p>}
+                  {item.returnTime && <p className="text-sm text-orange-700"><span className="font-semibold">Return Time:</span> {item.returnTime}</p>}
+                  {item.returnMessage && <p className="text-sm text-orange-700"><span className="font-semibold">Return Message:</span> {item.returnMessage}</p>}
 
                   {item.status === "pending" && (
                     <div className="pt-2">
-                      <Button onClick={() => handleCancel(item.id)} size="sm" variant="danger">
-                        Cancel Request
-                      </Button>
+                      <Button onClick={() => handleCancel(item.id)} size="sm" variant="danger">Cancel Request</Button>
                     </div>
                   )}
 
                   {["approved", "vehicle_received", "parked"].includes(item.status) && (
                     <div className="pt-3 border-t border-gray-200 space-y-3">
                       <p className="text-sm font-semibold text-[#163720]">Request Car Back</p>
-
                       <input
                         className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
                         placeholder="Return Location"
                         value={returnForms[item.id]?.returnLocation || ""}
-                        onChange={(e) =>
-                          handleReturnChange(item.id, "returnLocation", e.target.value)
-                        }
+                        onChange={(e) => handleReturnChange(item.id, "returnLocation", e.target.value)}
                       />
-
                       <input
                         className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
                         type="datetime-local"
                         value={returnForms[item.id]?.returnTime || ""}
-                        onChange={(e) =>
-                          handleReturnChange(item.id, "returnTime", e.target.value)
-                        }
+                        onChange={(e) => handleReturnChange(item.id, "returnTime", e.target.value)}
                       />
-
                       <textarea
                         className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
                         placeholder="Message to your valet (optional)"
                         value={returnForms[item.id]?.returnMessage || ""}
-                        onChange={(e) =>
-                          handleReturnChange(item.id, "returnMessage", e.target.value)
-                        }
+                        onChange={(e) => handleReturnChange(item.id, "returnMessage", e.target.value)}
                       />
-
-                      <Button onClick={() => handleRequestReturn(item.id)} size="sm">
-                        Request Car Back
-                      </Button>
+                      <Button onClick={() => handleRequestReturn(item.id)} size="sm">Request Car Back</Button>
                     </div>
                   )}
                 </div>
@@ -472,8 +376,7 @@ export default function ValetPage() {
 
         <section className="rounded-2xl border border-gray-200 bg-white shadow-lg p-6">
           <div className="flex items-center gap-2 text-orange-600 text-xl font-semibold mb-4">
-            <Briefcase className="w-5 h-5" />
-            Become a Valet Worker
+            <Briefcase className="w-5 h-5" /> Become a Valet Worker
           </div>
           <div className="space-y-2 text-gray-700">
             <p>Interested in helping students during peak parking hours?</p>
@@ -483,10 +386,7 @@ export default function ValetPage() {
         </section>
 
         <div className="text-center">
-          <Link
-            href="/"
-            className="inline-block px-5 py-3 rounded-xl bg-green-700 text-white font-medium hover:bg-green-800 transition"
-          >
+          <Link href="/" className="inline-block px-5 py-3 rounded-xl bg-green-700 text-white font-medium hover:bg-green-800 transition">
             Back to Dashboard
           </Link>
         </div>
