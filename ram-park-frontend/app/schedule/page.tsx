@@ -116,6 +116,112 @@ function parseDays(value: string): DayCode[] {
   });
 }
 
+// Parser for FSC Banner print format (the PDF you download from OASIS)
+// Handles the spaced-out token format that pdfjs produces (e.g. "01 : 40 PM")
+function parseBannerFormat(rawText: string): UploadedClass[] {
+  const dayMap: Record<string, DayCode> = {
+    Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu",
+    Friday: "Fri", Saturday: "Sat", Sunday: "Sun"
+  };
+
+  function to24(t: string): string {
+    const m = t.trim().match(/(\d{1,2}):(\d{2})\s*([AP]M)/i);
+    if (!m) return t;
+    let h = parseInt(m[1]);
+    const min = m[2];
+    const period = m[3].toUpperCase();
+    if (period === "PM" && h !== 12) h += 12;
+    if (period === "AM" && h === 12) h = 0;
+    return `${String(h).padStart(2, "0")}:${min}`;
+  }
+
+  // Get all non-empty lines
+  const lines = rawText.split("\n").map((l: string) => l.trim()).filter(Boolean);
+
+  // First pass: reconstruct broken time tokens like "01", ":", "40", "PM"
+  const joined: string[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\d{1,2}$/.test(l) && lines[i + 1] === ":" && /^\d{2}$/.test(lines[i + 2])) {
+      const period = lines[i + 3];
+      joined.push(`${l}:${lines[i + 2]} ${period}`);
+      i += 4;
+    } else {
+      joined.push(l);
+      i++;
+    }
+  }
+
+  // Second pass: collapse "HH:MM AM - HH:MM PM" into single time line
+  const collapsed: string[] = [];
+  let j = 0;
+  while (j < joined.length) {
+    const l = joined[j];
+    if (
+      /^\d{1,2}:\d{2}\s*[AP]M$/i.test(l) &&
+      joined[j + 1] === "-" &&
+      /^\d{1,2}:\d{2}\s*[AP]M$/i.test(joined[j + 2])
+    ) {
+      collapsed.push(`${l} - ${joined[j + 2]}`);
+      j += 3;
+    } else {
+      collapsed.push(l);
+      j++;
+    }
+  }
+
+  const courseCodeRegex = /^([A-Z]{2,4}\s+\d{3}[A-Z0-9]*\s+[A-Z0-9]+)$/;
+  const dateRangeRegex = /^\d{2}\/\d{2}\/\d{4}\s*-\s*\d{2}\/\d{2}\/\d{4}$/;
+  const daysLineRegex = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(,\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))*$/;
+  const timeLineRegex = /^(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)$/i;
+  const locationRegex = /^Farmingdale,\s+(.+?),\s+(.+)$/;
+
+  const results: UploadedClass[] = [];
+  let idx = 1;
+
+  for (let i = 0; i < collapsed.length; i++) {
+    const line = collapsed[i];
+    const nextLine = collapsed[i + 1] || "";
+    const codeMatch = nextLine.match(courseCodeRegex);
+    if (!codeMatch) continue;
+
+    const title = line.trim();
+    const code = codeMatch[1].trim();
+    if (title === "Title" || !title || /^\d/.test(title)) continue;
+
+    let days: DayCode[] = [];
+    let startTime = "";
+    let endTime = "";
+    let building = "";
+    let room = "";
+
+    for (let j = i + 2; j < Math.min(i + 15, collapsed.length); j++) {
+      const next = collapsed[j];
+      if (dateRangeRegex.test(next)) continue;
+      if (!days.length && daysLineRegex.test(next)) {
+        days = next.split(",").map((d: string) => dayMap[d.trim()]).filter(Boolean) as DayCode[];
+        continue;
+      }
+      if (!startTime && timeLineRegex.test(next)) {
+        const tm = next.match(timeLineRegex);
+        if (tm) { startTime = to24(tm[1]); endTime = to24(tm[2]); continue; }
+      }
+      if (!building && locationRegex.test(next)) {
+        const loc = next.match(locationRegex);
+        if (loc) { building = loc[1].trim(); room = loc[2].trim(); break; }
+      }
+    }
+
+    if (!startTime || !building || building.includes("Online") || !days.length) continue;
+
+    results.push({ id: `banner-${idx++}`, course: `${code} · ${title}`, building, room, startTime, endTime, days });
+  }
+
+  return results;
+}
+
+// Parser for Student Detail Schedule text format
 function parseDetailScheduleText(text: string): UploadedClass[] {
   const normalized = text.replace(/\r/g, "");
   const blocks = normalized.split(/(?=[A-Z][A-Za-z&/\- ]+\s-\s[A-Z]{2,4}\s\d{3})/g).map((block) => block.trim()).filter(Boolean);
@@ -198,19 +304,17 @@ export default function SchedulePage() {
   }
 
   async function removeClass(id: string) {
-  setClasses((prev) => prev.filter((item) => item.id !== id));
-  
-  // Also delete from Firestore
-  try {
-    const { doc, deleteDoc, collection } = await import("firebase/firestore");
-    const user = auth.currentUser;
-    if (user) {
-      await deleteDoc(doc(collection(db, "schedules", user.uid, "classes"), id));
+    setClasses((prev) => prev.filter((item) => item.id !== id));
+    try {
+      const { doc, deleteDoc, collection } = await import("firebase/firestore");
+      const user = auth.currentUser;
+      if (user) {
+        await deleteDoc(doc(collection(db, "schedules", user.uid, "classes"), id));
+      }
+    } catch (e) {
+      console.error("Failed to delete class from Firestore:", e);
     }
-  } catch (e) {
-    console.error("Failed to delete class from Firestore:", e);
   }
-}
 
   async function handleScheduleUpload(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -228,36 +332,58 @@ export default function SchedulePage() {
       return;
     }
 
-    // Handle PDF and images using Claude AI
+    // Handle PDF — extract text in browser using pdfjs, no API key needed
     const isPdf = file.type === "application/pdf" || file.name.endsWith(".pdf");
-    const isImage = file.type.startsWith("image/");
-
-    if (isPdf || isImage) {
+    if (isPdf) {
       setAnalyzing(true);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
+        const pdfjsLib = await import("pdfjs-dist");
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.mjs",
+          import.meta.url
+        ).toString();
 
-        const res = await fetch("http://127.0.0.1:8000/recommend/extract-schedule", {
-          method: "POST",
-          body: formData,
-        });
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-        if (!res.ok) throw new Error("Extraction failed");
-        const data = await res.json();
+        // Extract text from all pages with newlines preserved
+        let fullText = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const pageText = content.items.map((item: any) => item.str).join("\n");
+          fullText += pageText + "\n";
+        }
 
-        if (data.classes && data.classes.length > 0) {
-          setClasses(data.classes);
+        setDetailScheduleText(fullText);
+
+        // Try FSC Banner format first (OASIS print schedule)
+        let parsed = parseBannerFormat(fullText);
+
+        // Fall back to detail schedule format if Banner finds nothing
+        if (parsed.length === 0) {
+          parsed = parseDetailScheduleText(fullText);
+        }
+
+        if (parsed.length > 0) {
+          setClasses(parsed);
           setErrorMsg("");
         } else {
-          setErrorMsg("Could not extract classes. Try pasting the schedule text instead.");
+          setErrorMsg("Could not parse classes from this PDF. Try pasting the schedule text manually instead.");
         }
       } catch (e) {
         console.error("PDF extraction error:", e);
-        setErrorMsg("Failed to read the file. Try pasting the schedule text instead.");
+        setErrorMsg("Failed to read the PDF. Try pasting the schedule text instead.");
       } finally {
         setAnalyzing(false);
       }
+      return;
+    }
+
+    // Images not supported without API key
+    const isImage = file.type.startsWith("image/");
+    if (isImage) {
+      setErrorMsg("Image upload is not supported. Please upload a PDF or paste your schedule text.");
     }
   }
 
@@ -389,14 +515,14 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
               Turn your class schedule into <span style={{ color: C.goldLight }}>parking predictions</span>
             </h1>
             <p style={{ fontSize: 16, color: C.muted, lineHeight: 1.75, maxWidth: 640 }}>
-              Add classes manually, paste a student detail schedule, or upload a PDF/image. RamPark uses AI to extract your schedule and rank the top 3 closest parking lots.
+              Add classes manually, paste a student detail schedule, or upload your FSC schedule PDF. RamPark extracts your classes and ranks the top 3 closest parking lots.
             </p>
 
             <div className="schedule-action-row">
               <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: 12, background: C.bgPanel, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", fontWeight: 700 }}>
                 <Upload size={16} color={C.gold} />
-                Upload PDF / Image
-                <input type="file" accept="image/*,.pdf,.txt,.html" onChange={handleScheduleUpload} style={{ display: "none" }} />
+                Upload FSC Schedule PDF
+                <input type="file" accept=".pdf,.txt,.html" onChange={handleScheduleUpload} style={{ display: "none" }} />
               </label>
               <Btn variant="secondary" size="md" onClick={loadSampleDetailSchedule}>
                 <FileText size={16} color={C.gold} /> Use Sample Schedule
@@ -417,14 +543,14 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
 
             {analyzing && (
               <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: "#1a2d0f", border: `1px solid ${C.border}`, color: C.muted, fontSize: 13 }}>
-                🤖 Processing your schedule with AI...
+                🤖 Processing your schedule...
               </div>
             )}
 
             <div style={{ marginTop: 16, padding: "14px 16px", borderRadius: 14, background: C.bg, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
               <ImageIcon size={16} color={C.gold} />
               <p style={{ fontSize: 13, color: C.muted }}>
-                {uploadedFileName ? `Selected: ${uploadedFileName}` : "Upload a PDF or image of your schedule — AI will extract the classes automatically."}
+                {uploadedFileName ? `Selected: ${uploadedFileName}` : "Upload your schedule PDF from OASIS — classes will be extracted automatically, no API key needed!"}
               </p>
             </div>
 
@@ -472,8 +598,12 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
                 <p style={{ fontSize: 12, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Paste student detail schedule text</p>
                 <textarea value={detailScheduleText} onChange={(e) => setDetailScheduleText(e.target.value)} placeholder="Paste the copied text from a student detail schedule here..." style={{ width: "100%", minHeight: 220, resize: "vertical", background: "transparent", border: "none", color: C.muted, fontSize: 12, lineHeight: 1.7, outline: "none", fontFamily: "inherit" }} />
                 <div style={{ marginTop: 12 }}>
-                  <Btn variant="secondary" size="sm" onClick={() => { const parsed = parseDetailScheduleText(detailScheduleText); if (parsed.length) setClasses(parsed); }}>
-                    Parse Detail Schedule Text
+                  <Btn variant="secondary" size="sm" onClick={() => {
+                    let parsed = parseBannerFormat(detailScheduleText);
+                    if (parsed.length === 0) parsed = parseDetailScheduleText(detailScheduleText);
+                    if (parsed.length) setClasses(parsed);
+                  }}>
+                    Parse Schedule Text
                   </Btn>
                 </div>
               </div>
@@ -528,7 +658,7 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
                 </div>
               ) : classes.length === 0 ? (
                 <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, lineHeight: 1.7 }}>
-                  No classes added yet. Add them manually, upload a PDF, or paste a student detail schedule.
+                  No classes added yet. Upload your FSC schedule PDF, add them manually, or paste schedule text.
                 </div>
               ) : (
                 classes.map((item) => (
