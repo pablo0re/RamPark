@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { getValetRequests } from '@/lib/api';
-import { Settings, Bell, LogOut, History, User as UserIcon, Image as ImageIcon, Trash2, MapPin, Car, X, Trophy, ArrowLeft } from 'lucide-react';
+import { Settings, Bell, LogOut, Trash2, MapPin, Car, X, ArrowLeft } from 'lucide-react';
 
 export default function TopBar() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function TopBar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [valetRequests, setValetRequests] = useState<any[]>([]);
+  const [carpoolNotifications, setCarpoolNotifications] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
 
   useEffect(() => {
@@ -54,12 +56,32 @@ export default function TopBar() {
     }
   };
 
+  // Load carpool notifications for current user
+  const loadCarpoolNotifications = async () => {
+    if (!user) return;
+    try {
+      const snap = await getDocs(collection(db, 'carpool_notifications'));
+      const mine = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((n: any) =>
+          n.toUserId === user.uid || n.toUserEmail?.toLowerCase() === user.email?.toLowerCase()
+        );
+      setCarpoolNotifications(mine);
+    } catch (e) {
+      console.error('Failed to load carpool notifications:', e);
+    }
+  };
+
   useEffect(() => {
     router.prefetch('/');
     loadValetRequests();
     const interval = setInterval(loadValetRequests, 1800000);
     return () => clearInterval(interval);
   }, [router]);
+
+  useEffect(() => {
+    if (user) loadCarpoolNotifications();
+  }, [user]);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -97,6 +119,8 @@ export default function TopBar() {
 
   const allNotifications = useMemo(() => {
     if (!user?.email) return [];
+
+    // Valet notifications
     let relevantRequests = valetRequests;
     if (!isAdmin) {
       relevantRequests = valetRequests.filter((item) => {
@@ -105,7 +129,7 @@ export default function TopBar() {
         return emailMatch || nameMatch;
       });
     }
-    const notifications = relevantRequests.flatMap((item) => {
+    const valetNotes = relevantRequests.flatMap((item) => {
       const notes: { id: string; text: string; createdAt: string }[] = [];
       if (isAdmin) {
         if (item.status === 'pending') notes.push({ id: `${item.id}-pending`, text: `New valet request from ${item.studentName} at ${item.pickupLocation}.`, createdAt: item.createdAt || '' });
@@ -123,8 +147,16 @@ export default function TopBar() {
       }
       return notes;
     });
-    return notifications.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [valetRequests, user, isAdmin]);
+
+    // Carpool notifications
+    const carpoolNotes = carpoolNotifications.map((n: any) => ({
+      id: `carpool-${n.id}`,
+      text: `🚗 ${n.message}`,
+      createdAt: n.createdAt || '',
+    }));
+
+    return [...valetNotes, ...carpoolNotes].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [valetRequests, carpoolNotifications, user, isAdmin]);
 
   const unreadNotifications = useMemo(() => {
     return allNotifications.filter((note) => !dismissedNotifications.includes(note.id));
@@ -134,7 +166,6 @@ export default function TopBar() {
     <header className="sticky top-0 z-[100] w-full border-b border-[#2a5438] bg-[#0d2818]/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          {/* Gear icon — links to settings page, no dropdown */}
           <Link
             href="/theme-mode"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-[#2a5438] bg-[#142a1e] text-emerald-200 hover:border-[#3a7a50] hover:text-emerald-100 transition"
@@ -171,7 +202,7 @@ export default function TopBar() {
                 <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-[#2a5438] bg-[#142a1e] shadow-2xl py-2 z-50">
                   <div className="px-4 py-3 border-b border-[#2a5438]">
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">Notifications</div>
-                    <div className="mt-1 text-[11px] text-emerald-200/80">{isAdmin ? 'Live valet admin updates' : 'Live valet status updates'}</div>
+                    <div className="mt-1 text-[11px] text-emerald-200/80">Valet & carpool updates</div>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
                     {unreadNotifications.length === 0 ? (
@@ -219,8 +250,6 @@ export default function TopBar() {
                     <div className="truncate text-[11px] font-semibold text-emerald-100">{user.email}</div>
                   </div>
                   <div className="my-1 border-t border-[#2a5438]" />
-
-                  {/* If on settings page — just show Go Back */}
                   {isSettingsPage ? (
                     <button
                       onClick={() => { setProfileOpen(false); router.push('/'); }}

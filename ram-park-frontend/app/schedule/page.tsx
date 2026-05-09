@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
-import { ArrowRight, CalendarDays, CloudRain, Clock3, FileText, Image as ImageIcon, MapPin, Sparkles, Upload, Wand2 } from "lucide-react";
+import { ArrowRight, CalendarDays, CloudRain, Clock3, FileText, Image as ImageIcon, MapPin, Sparkles, Upload, Wand2, Calendar } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 
 const C = {
@@ -116,14 +116,11 @@ function parseDays(value: string): DayCode[] {
   });
 }
 
-// Parser for FSC Banner print format (the PDF you download from OASIS)
-// Handles the spaced-out token format that pdfjs produces (e.g. "01 : 40 PM")
 function parseBannerFormat(rawText: string): UploadedClass[] {
   const dayMap: Record<string, DayCode> = {
     Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu",
     Friday: "Fri", Saturday: "Sat", Sunday: "Sun"
   };
-
   function to24(t: string): string {
     const m = t.trim().match(/(\d{1,2}):(\d{2})\s*([AP]M)/i);
     if (!m) return t;
@@ -134,94 +131,53 @@ function parseBannerFormat(rawText: string): UploadedClass[] {
     if (period === "AM" && h === 12) h = 0;
     return `${String(h).padStart(2, "0")}:${min}`;
   }
-
-  // Get all non-empty lines
   const lines = rawText.split("\n").map((l: string) => l.trim()).filter(Boolean);
-
-  // First pass: reconstruct broken time tokens like "01", ":", "40", "PM"
   const joined: string[] = [];
   let i = 0;
   while (i < lines.length) {
     const l = lines[i];
     if (/^\d{1,2}$/.test(l) && lines[i + 1] === ":" && /^\d{2}$/.test(lines[i + 2])) {
-      const period = lines[i + 3];
-      joined.push(`${l}:${lines[i + 2]} ${period}`);
+      joined.push(`${l}:${lines[i + 2]} ${lines[i + 3]}`);
       i += 4;
-    } else {
-      joined.push(l);
-      i++;
-    }
+    } else { joined.push(l); i++; }
   }
-
-  // Second pass: collapse "HH:MM AM - HH:MM PM" into single time line
   const collapsed: string[] = [];
   let j = 0;
   while (j < joined.length) {
     const l = joined[j];
-    if (
-      /^\d{1,2}:\d{2}\s*[AP]M$/i.test(l) &&
-      joined[j + 1] === "-" &&
-      /^\d{1,2}:\d{2}\s*[AP]M$/i.test(joined[j + 2])
-    ) {
-      collapsed.push(`${l} - ${joined[j + 2]}`);
-      j += 3;
-    } else {
-      collapsed.push(l);
-      j++;
-    }
+    if (/^\d{1,2}:\d{2}\s*[AP]M$/i.test(l) && joined[j + 1] === "-" && /^\d{1,2}:\d{2}\s*[AP]M$/i.test(joined[j + 2])) {
+      collapsed.push(`${l} - ${joined[j + 2]}`); j += 3;
+    } else { collapsed.push(l); j++; }
   }
-
   const courseCodeRegex = /^([A-Z]{2,4}\s+\d{3}[A-Z0-9]*\s+[A-Z0-9]+)$/;
   const dateRangeRegex = /^\d{2}\/\d{2}\/\d{4}\s*-\s*\d{2}\/\d{2}\/\d{4}$/;
   const daysLineRegex = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(,\s*(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))*$/;
   const timeLineRegex = /^(\d{1,2}:\d{2}\s*[AP]M)\s*-\s*(\d{1,2}:\d{2}\s*[AP]M)$/i;
   const locationRegex = /^Farmingdale,\s+(.+?),\s+(.+)$/;
-
   const results: UploadedClass[] = [];
   let idx = 1;
-
   for (let i = 0; i < collapsed.length; i++) {
     const line = collapsed[i];
     const nextLine = collapsed[i + 1] || "";
     const codeMatch = nextLine.match(courseCodeRegex);
     if (!codeMatch) continue;
-
     const title = line.trim();
     const code = codeMatch[1].trim();
     if (title === "Title" || !title || /^\d/.test(title)) continue;
-
-    let days: DayCode[] = [];
-    let startTime = "";
-    let endTime = "";
-    let building = "";
-    let room = "";
-
+    let days: DayCode[] = [], startTime = "", endTime = "", building = "", room = "";
     for (let j = i + 2; j < Math.min(i + 15, collapsed.length); j++) {
       const next = collapsed[j];
       if (dateRangeRegex.test(next)) continue;
-      if (!days.length && daysLineRegex.test(next)) {
-        days = next.split(",").map((d: string) => dayMap[d.trim()]).filter(Boolean) as DayCode[];
-        continue;
-      }
-      if (!startTime && timeLineRegex.test(next)) {
-        const tm = next.match(timeLineRegex);
-        if (tm) { startTime = to24(tm[1]); endTime = to24(tm[2]); continue; }
-      }
-      if (!building && locationRegex.test(next)) {
-        const loc = next.match(locationRegex);
-        if (loc) { building = loc[1].trim(); room = loc[2].trim(); break; }
-      }
+      if (!days.length && daysLineRegex.test(next)) { days = next.split(",").map((d: string) => dayMap[d.trim()]).filter(Boolean) as DayCode[]; continue; }
+      if (!startTime && timeLineRegex.test(next)) { const tm = next.match(timeLineRegex); if (tm) { startTime = to24(tm[1]); endTime = to24(tm[2]); continue; } }
+      if (!building && locationRegex.test(next)) { const loc = next.match(locationRegex); if (loc) { building = loc[1].trim(); room = loc[2].trim(); break; } }
     }
-
     if (!startTime || !building || building.includes("Online") || !days.length) continue;
-
     results.push({ id: `banner-${idx++}`, course: `${code} · ${title}`, building, room, startTime, endTime, days });
   }
-
   return results;
 }
 
-// Parser for Student Detail Schedule text format
 function parseDetailScheduleText(text: string): UploadedClass[] {
   const normalized = text.replace(/\r/g, "");
   const blocks = normalized.split(/(?=[A-Z][A-Za-z&/\- ]+\s-\s[A-Z]{2,4}\s\d{3})/g).map((block) => block.trim()).filter(Boolean);
@@ -250,7 +206,169 @@ function to24Hour(time: string): string {
   return `${String(hour).padStart(2, "0")}:${minute}`;
 }
 
+// ── One-Time Visit Tab ────────────────────────────────────────────────────────
+function OneDemandTab() {
+  const [visitForm, setVisitForm] = useState({
+    date: "",
+    time: "",
+    building: "Gleeson Hall",
+  });
+  const [analyzing, setAnalyzing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [recommendations, setRecommendations] = useState<RecommendationLot[]>([]);
+
+  async function analyzeVisit() {
+    if (!visitForm.date || !visitForm.time || !visitForm.building) {
+      setErrorMsg("Please fill in all fields.");
+      return;
+    }
+    setAnalyzing(true);
+    setErrorMsg("");
+    setRecommendations([]);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) { setErrorMsg("Please sign in to get recommendations."); setAnalyzing(false); return; }
+
+      // Build a one-time class from the form
+      const visitDate = new Date(visitForm.date + "T12:00:00-05:00");
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dayCode = dayNames[visitDate.getDay()] as DayCode;
+
+      // Save this one-time visit as a temporary class and call the recommend endpoint
+      const { doc, setDoc, deleteDoc, collection, getDocs } = await import("firebase/firestore");
+
+      const tempId = `ondemand-${Date.now()}`;
+      const tempClass: UploadedClass = {
+        id: tempId,
+        course: "One-Time Visit",
+        building: visitForm.building,
+        room: "",
+        startTime: visitForm.time,
+        endTime: visitForm.time,
+        days: [dayCode],
+      };
+
+      // Temporarily save to Firestore so backend can read it
+      await setDoc(doc(collection(db, "schedules", user.uid, "classes"), tempId), tempClass);
+
+      const token = await user.getIdToken();
+      const res = await fetch("http://127.0.0.1:8000/recommend/suggest", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+
+      // Remove temp class after fetch
+      await deleteDoc(doc(collection(db, "schedules", user.uid, "classes"), tempId));
+
+      if (!res.ok) throw new Error(`Backend error: ${res.status}`);
+      const data = await res.json();
+
+      if (data.recommendations && data.recommendations.length > 0) {
+        setRecommendations(data.recommendations.map((r: any) => ({
+          id: r.id, name: r.name || r.id,
+          distance: `${r.distance_m}m from ${visitForm.building}`,
+          occupancyPercent: r.occupancy_percent || 0,
+          color: classifyOccupancy(r.occupancy_percent || 0),
+          reason: r.reason, warning: r.warning || undefined,
+        })));
+      } else {
+        setErrorMsg(data.message || "No recommendations available.");
+      }
+    } catch (e: any) {
+      console.error(e);
+      setErrorMsg("Could not get recommendations. Make sure you are signed in and the backend is running.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 26, alignItems: "start" }}>
+      {/* Form */}
+      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 28 }}>
+        <div style={{ marginBottom: 20 }}>
+          <Badge variant="gold">One-Time Visit</Badge>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12, color: C.text }}>Plan a single trip</h2>
+          <p style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>
+            Not part of your regular schedule? Enter the date, time, and building you're heading to — we'll find the best lot for that visit.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <Field
+            label="Date"
+            type="date"
+            value={visitForm.date}
+            onChange={e => setVisitForm(prev => ({ ...prev, date: e.target.value }))}
+            min={new Date().toISOString().split("T")[0]}
+          />
+          <Field
+            label="Arrival Time"
+            type="time"
+            value={visitForm.time}
+            onChange={e => setVisitForm(prev => ({ ...prev, time: e.target.value }))}
+          />
+          <SelectField
+            label="Building / Destination"
+            value={visitForm.building}
+            options={buildingOptions}
+            onChange={e => setVisitForm(prev => ({ ...prev, building: e.target.value }))}
+          />
+        </div>
+
+        {visitForm.date && visitForm.time && (
+          <div style={{ marginTop: 16, padding: "12px 14px", borderRadius: 12, background: C.bg, border: `1px solid ${C.border}`, fontSize: 13, color: C.muted }}>
+            📅 {(() => { const [y,m,d] = visitForm.date.split("-").map(Number); return new Date(y, m-1, d).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }); })()} at {visitForm.time} → {visitForm.building}
+          </div>
+        )}
+
+        {errorMsg && (
+          <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: "#2a0f10", border: "1px solid #f87171", color: "#f87171", fontSize: 13 }}>
+            {errorMsg}
+          </div>
+        )}
+
+        <div style={{ marginTop: 20 }}>
+          <Btn variant="primary" size="lg" onClick={analyzeVisit} disabled={analyzing}>
+            <Sparkles size={16} /> {analyzing ? "Finding best lots..." : "Find Parking"}
+          </Btn>
+        </div>
+      </div>
+
+      {/* Results */}
+      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 28 }}>
+        <div style={{ marginBottom: 20 }}>
+          <Badge variant="gold">Top 3 Lots</Badge>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12, color: C.text }}>Recommended Lots</h2>
+        </div>
+
+        {analyzing && (
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, textAlign: "center" }}>
+            <div style={{ fontSize: 24, marginBottom: 12 }}>🤖</div>
+            Finding the best lots for your visit...
+          </div>
+        )}
+
+        {!analyzing && recommendations.length === 0 && (
+          <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, lineHeight: 1.75 }}>
+            Fill in the date, time, and building on the left, then click <strong style={{ color: C.gold }}>Find Parking</strong> to get lot recommendations for your one-time visit.
+          </div>
+        )}
+
+        {!analyzing && recommendations.length > 0 && (
+          <div style={{ display: "grid", gap: 14 }}>
+            {recommendations.map((lot, index) => <LotCard key={lot.id} lot={lot} rank={index + 1} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
 export default function SchedulePage() {
+  const [activeTab, setActiveTab] = useState<"schedule" | "ondemand">("schedule");
   const [form, setForm] = useState({ course: "CSC 329", building: "Gleeson Hall", room: "101", startTime: "09:25", endTime: "10:40" });
   const [selectedDays, setSelectedDays] = useState<DayCode[]>(["Tue", "Thu"]);
   const [classes, setClasses] = useState<UploadedClass[]>([]);
@@ -271,7 +389,6 @@ export default function SchedulePage() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
   }, [classes]);
 
-  // Load saved schedule from Firestore on page load
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) { setLoadingSchedule(false); return; }
@@ -308,12 +425,8 @@ export default function SchedulePage() {
     try {
       const { doc, deleteDoc, collection } = await import("firebase/firestore");
       const user = auth.currentUser;
-      if (user) {
-        await deleteDoc(doc(collection(db, "schedules", user.uid, "classes"), id));
-      }
-    } catch (e) {
-      console.error("Failed to delete class from Firestore:", e);
-    }
+      if (user) await deleteDoc(doc(collection(db, "schedules", user.uid, "classes"), id));
+    } catch (e) { console.error("Failed to delete class from Firestore:", e); }
   }
 
   async function handleScheduleUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -321,8 +434,6 @@ export default function SchedulePage() {
     if (!file) return;
     setUploadedFileName(file.name);
     setErrorMsg("");
-
-    // Handle plain text files
     const isTextLike = file.type.includes("text") || file.name.endsWith(".txt") || file.name.endsWith(".html") || file.name.endsWith(".htm");
     if (isTextLike) {
       const text = await file.text();
@@ -331,60 +442,30 @@ export default function SchedulePage() {
       if (parsed.length) setClasses(parsed);
       return;
     }
-
-    // Handle PDF — extract text in browser using pdfjs, no API key needed
     const isPdf = file.type === "application/pdf" || file.name.endsWith(".pdf");
     if (isPdf) {
       setAnalyzing(true);
       try {
         const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url
-        ).toString();
-
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-        // Extract text from all pages with newlines preserved
         let fullText = "";
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const content = await page.getTextContent();
-          const pageText = content.items.map((item: any) => item.str).join("\n");
-          fullText += pageText + "\n";
+          fullText += content.items.map((item: any) => item.str).join("\n") + "\n";
         }
-
         setDetailScheduleText(fullText);
-
-        // Try FSC Banner format first (OASIS print schedule)
         let parsed = parseBannerFormat(fullText);
-
-        // Fall back to detail schedule format if Banner finds nothing
-        if (parsed.length === 0) {
-          parsed = parseDetailScheduleText(fullText);
-        }
-
-        if (parsed.length > 0) {
-          setClasses(parsed);
-          setErrorMsg("");
-        } else {
-          setErrorMsg("Could not parse classes from this PDF. Try pasting the schedule text manually instead.");
-        }
-      } catch (e) {
-        console.error("PDF extraction error:", e);
-        setErrorMsg("Failed to read the PDF. Try pasting the schedule text instead.");
-      } finally {
-        setAnalyzing(false);
-      }
+        if (parsed.length === 0) parsed = parseDetailScheduleText(fullText);
+        if (parsed.length > 0) { setClasses(parsed); setErrorMsg(""); }
+        else setErrorMsg("Could not parse classes from this PDF. Try pasting the schedule text manually instead.");
+      } catch (e) { console.error("PDF extraction error:", e); setErrorMsg("Failed to read the PDF. Try pasting the schedule text instead."); }
+      finally { setAnalyzing(false); }
       return;
     }
-
-    // Images not supported without API key
-    const isImage = file.type.startsWith("image/");
-    if (isImage) {
-      setErrorMsg("Image upload is not supported. Please upload a PDF or paste your schedule text.");
-    }
+    if (file.type.startsWith("image/")) setErrorMsg("Image upload is not supported. Please upload a PDF or paste your schedule text.");
   }
 
   function loadSampleDetailSchedule() {
@@ -422,23 +503,15 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
     if (classes.length === 0) { setErrorMsg("Please add at least one class first!"); return; }
     setAnalyzing(true);
     setErrorMsg("");
-
-    // Save to Firestore
     try {
       const { doc, setDoc, collection, getDocs, deleteDoc } = await import("firebase/firestore");
       const user = auth.currentUser;
       if (user) {
         const oldSnap = await getDocs(collection(db, "schedules", user.uid, "classes"));
         for (const d of oldSnap.docs) await deleteDoc(d.ref);
-        for (const cls of classes) {
-          await setDoc(doc(collection(db, "schedules", user.uid, "classes"), cls.id), cls);
-        }
+        for (const cls of classes) await setDoc(doc(collection(db, "schedules", user.uid, "classes"), cls.id), cls);
       }
-    } catch (e) {
-      console.error("Failed to save schedule:", e);
-    }
-
-    // Call backend
+    } catch (e) { console.error("Failed to save schedule:", e); }
     try {
       const user = auth.currentUser;
       if (!user) { setErrorMsg("Please sign in to get AI recommendations."); setAnalyzing(false); return; }
@@ -458,15 +531,11 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
           reason: r.reason, warning: r.warning || undefined,
         })));
         buildScheduleJson();
-      } else {
-        setErrorMsg(data.message || "No recommendations available for today.");
-      }
+      } else { setErrorMsg(data.message || "No recommendations available for today."); }
     } catch (e: any) {
       console.error("Recommendation error:", e);
       setErrorMsg("Could not get recommendations. Make sure you are signed in and the backend is running.");
-    } finally {
-      setAnalyzing(false);
-    }
+    } finally { setAnalyzing(false); }
   }
 
   return (
@@ -482,7 +551,7 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
         .schedule-card { height: 100%; display: flex; flex-direction: column; }
         .schedule-action-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
         .schedule-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 24px; }
-        @media (max-width: 1100px) { .schedule-top-grid, .schedule-middle-grid, .schedule-bottom-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 1100px) { .schedule-top-grid, .schedule-middle-grid, .schedule-bottom-grid, .ondemand-grid { grid-template-columns: 1fr !important; } }
         @media (max-width: 700px) { .schedule-stats-grid { grid-template-columns: 1fr; } .schedule-manual-grid { grid-template-columns: 1fr !important; } .schedule-time-grid { grid-template-columns: 1fr !important; } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: ${C.bg}; }
@@ -508,221 +577,178 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
       </nav>
 
       <main style={{ maxWidth: 1180, margin: "0 auto", padding: "42px 24px 96px" }}>
-        <section className="schedule-top-grid">
-          <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 28, padding: 32, boxShadow: "0 28px 80px rgba(0,0,0,0.32)" }}>
-            <Badge variant="gold">Upload + Analyze</Badge>
-            <h1 style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.06, marginTop: 18, marginBottom: 14 }}>
-              Turn your class schedule into <span style={{ color: C.goldLight }}>parking predictions</span>
-            </h1>
-            <p style={{ fontSize: 16, color: C.muted, lineHeight: 1.75, maxWidth: 640 }}>
-              Add classes manually, paste a student detail schedule, or upload your FSC schedule PDF. RamPark extracts your classes and ranks the top 3 closest parking lots.
-            </p>
 
-            <div className="schedule-action-row">
-              <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: 12, background: C.bgPanel, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", fontWeight: 700 }}>
-                <Upload size={16} color={C.gold} />
-                Upload FSC Schedule PDF
-                <input type="file" accept=".pdf,.txt,.html" onChange={handleScheduleUpload} style={{ display: "none" }} />
-              </label>
-              <Btn variant="secondary" size="md" onClick={loadSampleDetailSchedule}>
-                <FileText size={16} color={C.gold} /> Use Sample Schedule
-              </Btn>
-              <Btn variant="secondary" size="md" onClick={buildScheduleJson}>
-                <CalendarDays size={16} color={C.gold} /> Preview Extracted Data
-              </Btn>
-              <Btn variant="primary" size="md" onClick={analyzeSchedule} disabled={analyzing}>
-                <Wand2 size={16} /> {analyzing ? "Analyzing..." : "Analyze Schedule"}
-              </Btn>
-            </div>
+        {/* Tab switcher */}
+        <div style={{ display: "flex", gap: 4, background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 16, padding: 6, marginBottom: 32, maxWidth: 420 }}>
+          <button
+            onClick={() => setActiveTab("schedule")}
+            style={{
+              flex: 1, padding: "10px 20px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 14, transition: "all 0.18s",
+              background: activeTab === "schedule" ? C.gold : "transparent",
+              color: activeTab === "schedule" ? "#0d1f0f" : C.muted,
+            }}
+          >
+            📅 My Schedule
+          </button>
+          <button
+            onClick={() => setActiveTab("ondemand")}
+            style={{
+              flex: 1, padding: "10px 20px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 14, transition: "all 0.18s",
+              background: activeTab === "ondemand" ? C.gold : "transparent",
+              color: activeTab === "ondemand" ? "#0d1f0f" : C.muted,
+            }}
+          >
+            ⚡ One-Time Visit
+          </button>
+        </div>
 
-            {errorMsg && (
-              <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: "#2a0f10", border: "1px solid #f87171", color: "#f87171", fontSize: 13 }}>
-                {errorMsg}
-              </div>
-            )}
+        {/* One-Time Visit Tab */}
+        {activeTab === "ondemand" && <OneDemandTab />}
 
-            {analyzing && (
-              <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: "#1a2d0f", border: `1px solid ${C.border}`, color: C.muted, fontSize: 13 }}>
-                🤖 Processing your schedule...
-              </div>
-            )}
-
-            <div style={{ marginTop: 16, padding: "14px 16px", borderRadius: 14, background: C.bg, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-              <ImageIcon size={16} color={C.gold} />
-              <p style={{ fontSize: 13, color: C.muted }}>
-                {uploadedFileName ? `Selected: ${uploadedFileName}` : "Upload your schedule PDF from OASIS — classes will be extracted automatically, no API key needed!"}
-              </p>
-            </div>
-
-            <div className="schedule-stats-grid">
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18 }}>
-                <p style={{ fontSize: 11, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Classes</p>
-                <h3 style={{ fontSize: 28, fontWeight: 800 }}>{loadingSchedule ? "..." : totalClasses}</h3>
-              </div>
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18 }}>
-                <p style={{ fontSize: 11, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Primary Building</p>
-                <h3 style={{ fontSize: 18, fontWeight: 800 }}>{loadingSchedule ? "..." : primaryBuilding}</h3>
-              </div>
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18 }}>
-                <p style={{ fontSize: 11, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Busy Window</p>
-                <h3 style={{ fontSize: 18, fontWeight: 800 }}>{busyTime}</h3>
-              </div>
-            </div>
-          </div>
-
-          <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 28, padding: 28, boxShadow: "0 24px 60px rgba(0,0,0,0.28)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div>
-                <Badge>AI Factors</Badge>
-                <h2 style={{ fontSize: 22, fontWeight: 800, marginTop: 12 }}>Prediction Context</h2>
-              </div>
-              <Sparkles size={18} color={C.gold} />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <CloudRain size={16} color={C.gold} />
-                  <p style={{ fontSize: 13, fontWeight: 700 }}>Weather signal</p>
+        {/* My Schedule Tab */}
+        {activeTab === "schedule" && (
+          <>
+            <section className="schedule-top-grid">
+              <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 28, padding: 32, boxShadow: "0 28px 80px rgba(0,0,0,0.32)" }}>
+                <Badge variant="gold">Upload + Analyze</Badge>
+                <h1 style={{ fontSize: "clamp(34px, 5vw, 56px)", fontWeight: 800, lineHeight: 1.06, marginTop: 18, marginBottom: 14 }}>
+                  Turn your class schedule into <span style={{ color: C.goldLight }}>parking predictions</span>
+                </h1>
+                <p style={{ fontSize: 16, color: C.muted, lineHeight: 1.75, maxWidth: 640 }}>
+                  Add classes manually, paste a student detail schedule, or upload your FSC schedule PDF. RamPark extracts your classes and ranks the top 3 closest parking lots.
+                </p>
+                <div className="schedule-action-row">
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: 12, background: C.bgPanel, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", fontWeight: 700 }}>
+                    <Upload size={16} color={C.gold} />
+                    Upload FSC Schedule PDF
+                    <input type="file" accept=".pdf,.txt,.html" onChange={handleScheduleUpload} style={{ display: "none" }} />
+                  </label>
+                  <Btn variant="secondary" size="md" onClick={loadSampleDetailSchedule}><FileText size={16} color={C.gold} /> Use Sample Schedule</Btn>
+                  <Btn variant="secondary" size="md" onClick={buildScheduleJson}><CalendarDays size={16} color={C.gold} /> Preview Extracted Data</Btn>
+                  <Btn variant="primary" size="md" onClick={analyzeSchedule} disabled={analyzing}><Wand2 size={16} /> {analyzing ? "Analyzing..." : "Analyze Schedule"}</Btn>
                 </div>
-                <input value={weather} onChange={(e) => setWeather(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", color: C.muted, fontSize: 14, outline: "none" }} />
-              </div>
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <Clock3 size={16} color={C.gold} />
-                  <p style={{ fontSize: 13, fontWeight: 700 }}>Busy campus window</p>
+                {errorMsg && <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: "#2a0f10", border: "1px solid #f87171", color: "#f87171", fontSize: 13 }}>{errorMsg}</div>}
+                {analyzing && <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: "#1a2d0f", border: `1px solid ${C.border}`, color: C.muted, fontSize: 13 }}>🤖 Processing your schedule...</div>}
+                <div style={{ marginTop: 16, padding: "14px 16px", borderRadius: 14, background: C.bg, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
+                  <ImageIcon size={16} color={C.gold} />
+                  <p style={{ fontSize: 13, color: C.muted }}>{uploadedFileName ? `Selected: ${uploadedFileName}` : "Upload your schedule PDF from OASIS — classes will be extracted automatically, no API key needed!"}</p>
                 </div>
-                <input value={busyTime} onChange={(e) => setBusyTime(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", color: C.muted, fontSize: 14, outline: "none" }} />
-              </div>
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
-                <p style={{ fontSize: 12, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Paste student detail schedule text</p>
-                <textarea value={detailScheduleText} onChange={(e) => setDetailScheduleText(e.target.value)} placeholder="Paste the copied text from a student detail schedule here..." style={{ width: "100%", minHeight: 220, resize: "vertical", background: "transparent", border: "none", color: C.muted, fontSize: 12, lineHeight: 1.7, outline: "none", fontFamily: "inherit" }} />
-                <div style={{ marginTop: 12 }}>
-                  <Btn variant="secondary" size="sm" onClick={() => {
-                    let parsed = parseBannerFormat(detailScheduleText);
-                    if (parsed.length === 0) parsed = parseDetailScheduleText(detailScheduleText);
-                    if (parsed.length) setClasses(parsed);
-                  }}>
-                    Parse Schedule Text
-                  </Btn>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="schedule-middle-grid">
-          <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div>
-                <Badge>Manual Schedule Entry</Badge>
-                <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>Add classes</h2>
-              </div>
-              <CalendarDays size={18} color={C.gold} />
-            </div>
-            <div className="schedule-manual-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-              <Field label="Course" value={form.course} placeholder="CSC 329" onChange={(e) => setForm((prev) => ({ ...prev, course: e.target.value }))} />
-              <SelectField label="Building" value={form.building} options={buildingOptions} onChange={(e) => setForm((prev) => ({ ...prev, building: e.target.value }))} />
-              <Field label="Room" value={form.room} placeholder="101" onChange={(e) => setForm((prev) => ({ ...prev, room: e.target.value }))} />
-              <div className="schedule-time-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <Field label="Start" type="time" value={form.startTime} onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))} />
-                <Field label="End" type="time" value={form.endTime} onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))} />
-              </div>
-            </div>
-            <div style={{ marginTop: 18 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>Days</p>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {dayOptions.map((day) => {
-                  const active = selectedDays.includes(day);
-                  return <button key={day} type="button" onClick={() => toggleDay(day)} style={{ minWidth: 58, padding: "10px 14px", borderRadius: 12, border: `1px solid ${active ? C.gold : C.border}`, background: active ? "#2a1f08" : C.bg, color: active ? C.goldLight : C.muted, fontWeight: 800, cursor: "pointer" }}>{day}</button>;
-                })}
-              </div>
-            </div>
-            <div style={{ marginTop: 22 }}>
-              <Btn variant="primary" size="md" onClick={addClass}>Add Class <ArrowRight size={15} /></Btn>
-            </div>
-          </div>
-
-          <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div>
-                <Badge>Schedule Preview</Badge>
-                <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>Uploaded classes</h2>
-              </div>
-              <p style={{ fontSize: 13, color: C.gold }}>{classes.length} entries</p>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 380, overflowY: "auto", paddingRight: 6 }}>
-              {loadingSchedule ? (
-                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, textAlign: "center" }}>
-                  Loading your saved schedule...
-                </div>
-              ) : classes.length === 0 ? (
-                <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, lineHeight: 1.7 }}>
-                  No classes added yet. Upload your FSC schedule PDF, add them manually, or paste schedule text.
-                </div>
-              ) : (
-                classes.map((item) => (
-                  <div key={item.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, display: "flex", alignItems: "start", justifyContent: "space-between", gap: 14 }}>
-                    <div>
-                      <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>{item.course}</h3>
-                      <p style={{ fontSize: 13, color: C.muted, marginBottom: 6 }}>{item.building}{item.room ? ` · Room ${item.room}` : ""}</p>
-                      <p style={{ fontSize: 13, color: C.gold }}>{item.startTime} - {item.endTime} · {item.days.join(", ")}</p>
-                    </div>
-                    <button type="button" onClick={() => removeClass(item.id)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "8px 10px", cursor: "pointer" }}>Remove</button>
+                <div className="schedule-stats-grid">
+                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18 }}>
+                    <p style={{ fontSize: 11, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Classes</p>
+                    <h3 style={{ fontSize: 28, fontWeight: 800 }}>{loadingSchedule ? "..." : totalClasses}</h3>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="schedule-bottom-grid">
-          <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div>
-                <Badge variant="gold">Structured Output</Badge>
-                <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>Extracted Schedule Data</h2>
+                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18 }}>
+                    <p style={{ fontSize: 11, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Primary Building</p>
+                    <h3 style={{ fontSize: 18, fontWeight: 800 }}>{loadingSchedule ? "..." : primaryBuilding}</h3>
+                  </div>
+                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 18 }}>
+                    <p style={{ fontSize: 11, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Busy Window</p>
+                    <h3 style={{ fontSize: 18, fontWeight: 800 }}>{busyTime}</h3>
+                  </div>
+                </div>
               </div>
-              <Btn variant="secondary" size="sm" onClick={buildScheduleJson}>Preview Extracted Data</Btn>
-            </div>
-            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 18, padding: 18, minHeight: 360, overflowX: "auto" }}>
-              <pre style={{ fontSize: 12, color: C.muted, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
-                {scheduleJson ? JSON.stringify(scheduleJson, null, 2) : `{\n  "uploadedAt": "",\n  "sourceType": "detail-schedule",\n  "term": "",\n  "classes": []\n}`}
-              </pre>
-            </div>
-          </div>
 
-          <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-              <div>
-                <Badge variant="gold">Top 3 Lots</Badge>
-                <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>AI Parking Recommendations</h2>
+              <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 28, padding: 28, boxShadow: "0 24px 60px rgba(0,0,0,0.28)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                  <div><Badge>AI Factors</Badge><h2 style={{ fontSize: 22, fontWeight: 800, marginTop: 12 }}>Prediction Context</h2></div>
+                  <Sparkles size={18} color={C.gold} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><CloudRain size={16} color={C.gold} /><p style={{ fontSize: 13, fontWeight: 700 }}>Weather signal</p></div>
+                    <input value={weather} onChange={(e) => setWeather(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", color: C.muted, fontSize: 14, outline: "none" }} />
+                  </div>
+                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}><Clock3 size={16} color={C.gold} /><p style={{ fontSize: 13, fontWeight: 700 }}>Busy campus window</p></div>
+                    <input value={busyTime} onChange={(e) => setBusyTime(e.target.value)} style={{ width: "100%", background: "transparent", border: "none", color: C.muted, fontSize: 14, outline: "none" }} />
+                  </div>
+                  <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+                    <p style={{ fontSize: 12, color: C.dimmed, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Paste student detail schedule text</p>
+                    <textarea value={detailScheduleText} onChange={(e) => setDetailScheduleText(e.target.value)} placeholder="Paste the copied text from a student detail schedule here..." style={{ width: "100%", minHeight: 220, resize: "vertical", background: "transparent", border: "none", color: C.muted, fontSize: 12, lineHeight: 1.7, outline: "none", fontFamily: "inherit" }} />
+                    <div style={{ marginTop: 12 }}>
+                      <Btn variant="secondary" size="sm" onClick={() => { let parsed = parseBannerFormat(detailScheduleText); if (parsed.length === 0) parsed = parseDetailScheduleText(detailScheduleText); if (parsed.length) setClasses(parsed); }}>Parse Schedule Text</Btn>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Btn variant="primary" size="sm" onClick={analyzeSchedule} disabled={analyzing}>
-                <Sparkles size={15} /> {analyzing ? "Loading..." : "Run Analysis"}
-              </Btn>
-            </div>
+            </section>
 
-            {analyzing && (
-              <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, textAlign: "center" as const }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>🤖</div>
-                Asking AI to find the best lots for your schedule...
+            <section className="schedule-middle-grid">
+              <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                  <div><Badge>Manual Schedule Entry</Badge><h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>Add classes</h2></div>
+                  <CalendarDays size={18} color={C.gold} />
+                </div>
+                <div className="schedule-manual-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                  <Field label="Course" value={form.course} placeholder="CSC 329" onChange={(e) => setForm((prev) => ({ ...prev, course: e.target.value }))} />
+                  <SelectField label="Building" value={form.building} options={buildingOptions} onChange={(e) => setForm((prev) => ({ ...prev, building: e.target.value }))} />
+                  <Field label="Room" value={form.room} placeholder="101" onChange={(e) => setForm((prev) => ({ ...prev, room: e.target.value }))} />
+                  <div className="schedule-time-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                    <Field label="Start" type="time" value={form.startTime} onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))} />
+                    <Field label="End" type="time" value={form.endTime} onChange={(e) => setForm((prev) => ({ ...prev, endTime: e.target.value }))} />
+                  </div>
+                </div>
+                <div style={{ marginTop: 18 }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 10 }}>Days</p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {dayOptions.map((day) => { const active = selectedDays.includes(day); return <button key={day} type="button" onClick={() => toggleDay(day)} style={{ minWidth: 58, padding: "10px 14px", borderRadius: 12, border: `1px solid ${active ? C.gold : C.border}`, background: active ? "#2a1f08" : C.bg, color: active ? C.goldLight : C.muted, fontWeight: 800, cursor: "pointer" }}>{day}</button>; })}
+                  </div>
+                </div>
+                <div style={{ marginTop: 22 }}><Btn variant="primary" size="md" onClick={addClass}>Add Class <ArrowRight size={15} /></Btn></div>
               </div>
-            )}
 
-            {!analyzing && recommendations.length === 0 && (
-              <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, lineHeight: 1.75 }}>
-                Add your classes and click <strong style={{ color: C.gold }}>Analyze Schedule</strong> to get AI-powered lot recommendations based on your building, class time, weather, and occupancy.
+              <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                  <div><Badge>Schedule Preview</Badge><h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>Uploaded classes</h2></div>
+                  <p style={{ fontSize: 13, color: C.gold }}>{classes.length} entries</p>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: 380, overflowY: "auto", paddingRight: 6 }}>
+                  {loadingSchedule ? (
+                    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, textAlign: "center" }}>Loading your saved schedule...</div>
+                  ) : classes.length === 0 ? (
+                    <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, lineHeight: 1.7 }}>No classes added yet. Upload your FSC schedule PDF, add them manually, or paste schedule text.</div>
+                  ) : (
+                    classes.map((item) => (
+                      <div key={item.id} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, display: "flex", alignItems: "start", justifyContent: "space-between", gap: 14 }}>
+                        <div>
+                          <h3 style={{ fontSize: 16, fontWeight: 800, marginBottom: 6 }}>{item.course}</h3>
+                          <p style={{ fontSize: 13, color: C.muted, marginBottom: 6 }}>{item.building}{item.room ? ` · Room ${item.room}` : ""}</p>
+                          <p style={{ fontSize: 13, color: C.gold }}>{item.startTime} - {item.endTime} · {item.days.join(", ")}</p>
+                        </div>
+                        <button type="button" onClick={() => removeClass(item.id)} style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.muted, borderRadius: 10, padding: "8px 10px", cursor: "pointer" }}>Remove</button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            )}
+            </section>
 
-            {!analyzing && recommendations.length > 0 && (
-              <div style={{ display: "grid", gap: 14 }}>
-                {recommendations.map((lot, index) => <LotCard key={lot.id} lot={lot} rank={index + 1} />)}
+            <section className="schedule-bottom-grid">
+              <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                  <div><Badge variant="gold">Structured Output</Badge><h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>Extracted Schedule Data</h2></div>
+                  <Btn variant="secondary" size="sm" onClick={buildScheduleJson}>Preview Extracted Data</Btn>
+                </div>
+                <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 18, padding: 18, minHeight: 360, overflowX: "auto" }}>
+                  <pre style={{ fontSize: 12, color: C.muted, lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
+                    {scheduleJson ? JSON.stringify(scheduleJson, null, 2) : `{\n  "uploadedAt": "",\n  "sourceType": "detail-schedule",\n  "term": "",\n  "classes": []\n}`}
+                  </pre>
+                </div>
               </div>
-            )}
-          </div>
-        </section>
+
+              <div className="schedule-card" style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 24, padding: 26 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                  <div><Badge variant="gold">Top 3 Lots</Badge><h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12 }}>AI Parking Recommendations</h2></div>
+                  <Btn variant="primary" size="sm" onClick={analyzeSchedule} disabled={analyzing}><Sparkles size={15} /> {analyzing ? "Loading..." : "Run Analysis"}</Btn>
+                </div>
+                {analyzing && <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, textAlign: "center" as const }}><div style={{ fontSize: 24, marginBottom: 12 }}>🤖</div>Asking AI to find the best lots for your schedule...</div>}
+                {!analyzing && recommendations.length === 0 && <div style={{ background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 16, padding: 24, color: C.muted, lineHeight: 1.75 }}>Add your classes and click <strong style={{ color: C.gold }}>Analyze Schedule</strong> to get AI-powered lot recommendations.</div>}
+                {!analyzing && recommendations.length > 0 && <div style={{ display: "grid", gap: 14 }}>{recommendations.map((lot, index) => <LotCard key={lot.id} lot={lot} rank={index + 1} />)}</div>}
+              </div>
+            </section>
+          </>
+        )}
       </main>
     </div>
   );

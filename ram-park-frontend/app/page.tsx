@@ -451,6 +451,7 @@ const unreadNotifications = useMemo(() => {
       <Link href="/ai"><Btn variant="ghost">AI Spot Detection</Btn></Link>
       <Link href="/valet"><Btn variant="ghost">Valet</Btn></Link>
       <Link href="/leaderboard"><Btn variant="ghost">Leaderboard</Btn></Link>
+      <Link href="/carpool"><Btn variant="ghost">Carpool</Btn></Link>
       {user && (
   <div style={{ position: "relative" }}>
     <button
