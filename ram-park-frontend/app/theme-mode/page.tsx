@@ -11,7 +11,8 @@ import {
   Bell, History, User as UserIcon, MapPin, Car, Trophy,
   LogOut, Trash2, ChevronRight, Settings,
   Camera, Clock, CheckCircle, XCircle, AlertCircle,
-  Type, Globe, Loader2, MessageSquare
+  Type, Globe, Loader2, MessageSquare,
+  CreditCard
 } from "lucide-react";
 
 function formatStatus(status: string) {
@@ -261,6 +262,8 @@ export default function SettingsPage() {
     { href: "/valet", icon: Car, label: t.campusValet, desc: t.requestValet },
     { href: "/leaderboard", icon: Trophy, label: t.valetLeaderboard, desc: t.topValetUsers },
     { href: "/feedback", icon: MessageSquare, label: t.feedback, desc: t.feedbackDesc },
+    { href: "/payments", icon: CreditCard, label: "Payments", desc: "View and pay valet fees" },
+    { href: "/carpool/history", icon: Car, label: "Carpool History", desc: "Your ride offers and acceptances" },
   ];
 
   const initials = user?.displayName
