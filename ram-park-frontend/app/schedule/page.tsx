@@ -446,16 +446,12 @@ export default function SchedulePage() {
     if (isPdf) {
       setAnalyzing(true);
       try {
-        const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        let fullText = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          fullText += content.items.map((item: any) => item.str).join("\n") + "\n";
-        }
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/parse-pdf", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Server PDF parse failed");
+        const { text: fullText, error } = await res.json();
+        if (error) throw new Error(error);
         setDetailScheduleText(fullText);
         let parsed = parseBannerFormat(fullText);
         if (parsed.length === 0) parsed = parseDetailScheduleText(fullText);
