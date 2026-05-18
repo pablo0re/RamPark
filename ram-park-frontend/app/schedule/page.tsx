@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
-import { ArrowRight, CalendarDays, CloudRain, Clock3, FileText, Image as ImageIcon, MapPin, Sparkles, Upload, Wand2, Calendar } from "lucide-react";
+import { ArrowRight, CalendarDays, CloudRain, Clock3, FileText, Image as ImageIcon, Sparkles, Upload, Wand2 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 
 const C = {
@@ -20,6 +19,8 @@ type DayCode = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
 type UploadedClass = { id: string; course: string; building: string; room?: string; startTime: string; endTime: string; days: DayCode[]; };
 type ScheduleJson = { uploadedAt: string; sourceType: "detail-schedule" | "image" | "manual"; term?: string; classes: UploadedClass[]; };
 type RecommendationLot = { id: string; name: string; distance: string; occupancyPercent: number; color: OccColor; reason: string; warning?: string; };
+type ApiRecommendation = { id: string; name?: string; distance_m?: number; occupancy_percent?: number; reason: string; warning?: string | null; };
+type ApiRecommendResponse = { recommendations?: ApiRecommendation[]; message?: string; firstClass?: { building?: string; }; };
 
 interface BadgeProps { children: React.ReactNode; variant?: BadgeVariant; }
 interface BtnProps extends React.ButtonHTMLAttributes<HTMLButtonElement> { children: React.ReactNode; variant?: BtnVariant; size?: BtnSize; }
@@ -236,7 +237,7 @@ function OneDemandTab() {
       const dayCode = dayNames[visitDate.getDay()] as DayCode;
 
       // Save this one-time visit as a temporary class and call the recommend endpoint
-      const { doc, setDoc, deleteDoc, collection, getDocs } = await import("firebase/firestore");
+      const { doc, setDoc, deleteDoc, collection } = await import("firebase/firestore");
 
       const tempId = `ondemand-${Date.now()}`;
       const tempClass: UploadedClass = {
@@ -262,10 +263,10 @@ function OneDemandTab() {
       await deleteDoc(doc(collection(db, "schedules", user.uid, "classes"), tempId));
 
       if (!res.ok) throw new Error(`Backend error: ${res.status}`);
-      const data = await res.json();
+      const data = await res.json() as ApiRecommendResponse;
 
       if (data.recommendations && data.recommendations.length > 0) {
-        setRecommendations(data.recommendations.map((r: any) => ({
+        setRecommendations(data.recommendations.map((r) => ({
           id: r.id, name: r.name || r.id,
           distance: `${r.distance_m}m from ${visitForm.building}`,
           occupancyPercent: r.occupancy_percent || 0,
@@ -275,7 +276,7 @@ function OneDemandTab() {
       } else {
         setErrorMsg(data.message || "No recommendations available.");
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       setErrorMsg("Could not get recommendations. Make sure you are signed in and the backend is running.");
     } finally {
@@ -291,7 +292,7 @@ function OneDemandTab() {
           <Badge variant="gold">One-Time Visit</Badge>
           <h2 style={{ fontSize: 24, fontWeight: 800, marginTop: 12, color: C.text }}>Plan a single trip</h2>
           <p style={{ fontSize: 14, color: C.muted, marginTop: 8, lineHeight: 1.6 }}>
-            Not part of your regular schedule? Enter the date, time, and building you're heading to — we'll find the best lot for that visit.
+            Not part of your regular schedule? Enter the date, time, and building you&apos;re heading to — we&apos;ll find the best lot for that visit.
           </p>
         </div>
 
@@ -517,9 +518,9 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (!res.ok) throw new Error(`Backend error: ${res.status}`);
-      const data = await res.json();
+      const data = await res.json() as ApiRecommendResponse;
       if (data.recommendations && data.recommendations.length > 0) {
-        setRecommendations(data.recommendations.map((r: any) => ({
+        setRecommendations(data.recommendations.map((r) => ({
           id: r.id, name: r.name || r.id,
           distance: `${r.distance_m}m from ${data.firstClass?.building || "your building"}`,
           occupancyPercent: r.occupancy_percent || 0,
@@ -528,18 +529,17 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
         })));
         buildScheduleJson();
       } else { setErrorMsg(data.message || "No recommendations available for today."); }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Recommendation error:", e);
       setErrorMsg("Could not get recommendations. Make sure you are signed in and the backend is running.");
     } finally { setAnalyzing(false); }
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="schedule-page" style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', system-ui, sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: ${C.bg}; }
+        .schedule-page, .schedule-page * { box-sizing: border-box; }
         .schedule-top-grid, .schedule-middle-grid, .schedule-bottom-grid { display: grid; gap: 26px; align-items: stretch; }
         .schedule-top-grid { grid-template-columns: 1.1fr 0.9fr; margin-bottom: 28px; }
         .schedule-middle-grid { grid-template-columns: 1fr 1fr; margin-bottom: 28px; }
@@ -553,24 +553,6 @@ Class 9:25 am - 10:40 am TR Whitman Hall 209 Aug 25, 2025 - Dec 20, 2025 Lecture
         ::-webkit-scrollbar-track { background: ${C.bg}; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 3px; }
       `}</style>
-
-      <nav style={{ position: "sticky", top: 0, zIndex: 100, background: `${C.bg}ee`, backdropFilter: "blur(16px)", borderBottom: `1px solid ${C.border}44`, padding: "0 24px" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", height: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: C.bgPanel, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <MapPin size={16} color={C.gold} />
-            </div>
-            <span style={{ fontWeight: 800, fontSize: 17, color: C.text }}>RamPark</span>
-            <Badge variant="gold">Schedule AI</Badge>
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <Link href="/"><Btn variant="ghost">Home</Btn></Link>
-            <Link href="/status"><Btn variant="ghost">Status</Btn></Link>
-            <Link href="/map"><Btn variant="ghost">Map</Btn></Link>
-            <Link href="/ai"><Btn variant="ghost">AI Demo</Btn></Link>
-          </div>
-        </div>
-      </nav>
 
       <main style={{ maxWidth: 1180, margin: "0 auto", padding: "42px 24px 96px" }}>
 
