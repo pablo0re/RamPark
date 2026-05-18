@@ -2,11 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from firebase_config import db
 from auth import verify_token
 from datetime import datetime
+from google.cloud.firestore_v1.base_query import FieldFilter
 import requests, math, json, os, base64
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 router = APIRouter()
 
@@ -49,8 +53,8 @@ def get_weather():
 def count_crowd(building: str, start_time: str, today: str) -> int:
     try:
         docs = db.collection_group("classes") \
-                 .where("building", "==", building) \
-                 .where("days", "array_contains", today) \
+                 .where(filter=FieldFilter("building", "==", building)) \
+                 .where(filter=FieldFilter("days", "array_contains", today)) \
                  .stream()
         count = 0
         for doc in docs:
@@ -71,7 +75,7 @@ async def suggest_lots(user=Depends(verify_token)):
 
     classes_ref = db.collection("schedules").document(user_id) \
                     .collection("classes") \
-                    .where("days", "array_contains", today) \
+                    .where(filter=FieldFilter("days", "array_contains", today)) \
                     .stream()
     classes_today = [doc.to_dict() for doc in classes_ref]
 
@@ -151,22 +155,18 @@ No markdown. No explanation. Raw JSON array only.
 """
 
     try:
-        resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json"
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 600,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=10
+        if not openai_client:
+            raise RuntimeError("OPENAI_API_KEY is not configured")
+
+        resp = openai_client.responses.create(
+            model="gpt-5.2",
+            input=prompt,
+            max_output_tokens=600,
         )
-        ranked = json.loads(resp.json()["content"][0]["text"])
-    except Exception:
+        print("OPENAI RESPONSE:", resp.output_text)
+        ranked = json.loads(resp.output_text)
+    except Exception as e:
+        print("OPENAI FAILED, USING FALLBACK:", e)
         ranked = [
             {
                 "id": l["id"],
