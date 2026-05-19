@@ -27,6 +27,8 @@ export interface ValetRequestPayload {
   pickupLocation: string;
   requestedTime: string;
   userEmail?: string;
+  preferredLotId?: string;
+  preferredLotName?: string;
   notes?: string;
 }
 

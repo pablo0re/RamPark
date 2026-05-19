@@ -198,7 +198,7 @@ export default function HomePage() {
   const [valetRequests, setValetRequests] = useState<any[]>([]);
   const [dismissedNotifications, setDismissedNotifications] = useState<string[]>([]);
 
-  const ADMIN_EMAILS = ["orelpm@farmingdale.edu", "hamzm@farmingdale.edu"];
+  const ADMIN_EMAILS = ["orelpm@farmingdale.edu", "hamzm@farmingdale.edu", "admin@farmingdale.edu"];
   const isAdmin = ADMIN_EMAILS.includes(user?.email?.toLowerCase() ?? "");
   useEffect(() => {
     const i = setInterval(() => setPulse(p => !p), 2000);

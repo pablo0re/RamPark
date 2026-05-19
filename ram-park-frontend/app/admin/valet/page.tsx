@@ -242,6 +242,11 @@ const handleParkedChange = (id: string, value: string) => {
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Requested Time:</span> {item.requestedTime}
                   </p>
+                  {item.preferredLotName && (
+                    <p className="text-sm text-purple-700">
+                      <span className="font-semibold">Preferred Parking Lot:</span> {item.preferredLotName}
+                    </p>
+                  )}
                   <p className="text-sm text-gray-700">
                     <span className="font-semibold">Fee:</span> ${item.serviceFee || 5}
                   </p>

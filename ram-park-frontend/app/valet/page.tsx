@@ -10,6 +10,8 @@ import {
   getValetRequests,
   cancelValetRequest,
   requestVehicleReturn,
+  getLots,
+  type ParkingLot,
 } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import {
@@ -43,11 +45,14 @@ export default function ValetPage() {
     phoneNumber: "",
     pickupLocation: "",
     requestedTime: "",
+    preferredLotId: "",
+    preferredLotName: "",
     notes: "",
   });
 
   const [message, setMessage] = useState("");
   const [requests, setRequests] = useState<any[]>([]);
+  const [parkingLots, setParkingLots] = useState<ParkingLot[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [returnForms, setReturnForms] = useState<Record<string, { returnLocation: string; returnTime: string; returnMessage: string }>>({});
@@ -92,6 +97,18 @@ export default function ValetPage() {
     loadRequests();
   }, []);
 
+  useEffect(() => {
+    const loadLots = async () => {
+      try {
+        const data = await getLots();
+        setParkingLots(data.sort((a, b) => a.name.localeCompare(b.name)));
+      } catch (error) {
+        console.error("Failed to load parking lots:", error);
+      }
+    };
+    loadLots();
+  }, []);
+
   const myRequests = useMemo(() => {
     let filtered = requests;
     if (user?.email) {
@@ -127,6 +144,8 @@ export default function ValetPage() {
         phoneNumber: "",
         pickupLocation: "",
         requestedTime: "",
+        preferredLotId: "",
+        preferredLotName: "",
         notes: "",
       });
       loadRequests();
@@ -280,6 +299,25 @@ export default function ValetPage() {
               value={form.pickupLocation}
               onChange={(e) => setForm({ ...form, pickupLocation: e.target.value })}
             />
+            <select
+              className="w-full border border-gray-300 rounded-xl p-3 text-black bg-white"
+              value={form.preferredLotId}
+              onChange={(e) => {
+                const selectedLot = parkingLots.find((lot) => lot.id === e.target.value);
+                setForm({
+                  ...form,
+                  preferredLotId: selectedLot?.id || "",
+                  preferredLotName: selectedLot?.name || "",
+                });
+              }}
+            >
+              <option value="">Preferred parking lot (optional)</option>
+              {parkingLots.map((lot) => (
+                <option key={lot.id} value={lot.id}>
+                  {lot.name}
+                </option>
+              ))}
+            </select>
             <input
               className="w-full border border-gray-300 rounded-xl p-3 text-black placeholder:text-gray-500"
               type="datetime-local"
@@ -328,6 +366,7 @@ export default function ValetPage() {
                   <p className="text-sm text-gray-700"><span className="font-semibold">Phone:</span> {item.phoneNumber}</p>
                   <p className="text-sm text-gray-700"><span className="font-semibold">Pickup Location:</span> {item.pickupLocation}</p>
                   <p className="text-sm text-gray-700"><span className="font-semibold">Requested Time:</span> {item.requestedTime}</p>
+                  {item.preferredLotName && <p className="text-sm text-purple-700"><span className="font-semibold">Preferred Parking Lot:</span> {item.preferredLotName}</p>}
                   <p className="text-sm text-gray-700"><span className="font-semibold">Fee:</span> ${item.serviceFee || 5}</p>
                   <p className="text-sm text-gray-700"><span className="font-semibold">Payment:</span> {item.paymentNote}</p>
                   {item.notes && <p className="text-sm text-gray-700"><span className="font-semibold">Vehicle:</span> {item.notes}</p>}

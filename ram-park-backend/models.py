@@ -43,6 +43,8 @@ class ValetRequestCreate(BaseModel):
     pickupLocation: str
     requestedTime: str
     userEmail: Optional[str] = None
+    preferredLotId: Optional[str] = None
+    preferredLotName: Optional[str] = None
     notes: Optional[str] = None
 
 

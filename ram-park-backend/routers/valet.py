@@ -31,6 +31,12 @@ def get_least_busy_lot():
 
 @router.post("/request")
 async def request_valet(payload: ValetRequestCreate):
+    preferred_lot_name = payload.preferredLotName
+    if payload.preferredLotId and not preferred_lot_name:
+        lot_doc = db.collection("lots").document(payload.preferredLotId).get()
+        if lot_doc.exists:
+            preferred_lot_name = lot_doc.to_dict().get("name", payload.preferredLotId)
+
     valet_data = {
         "userId": payload.userId,
         "userEmail": payload.userEmail,
@@ -38,6 +44,8 @@ async def request_valet(payload: ValetRequestCreate):
         "phoneNumber": payload.phoneNumber,
         "pickupLocation": payload.pickupLocation,
         "requestedTime": payload.requestedTime,
+        "preferredLotId": payload.preferredLotId,
+        "preferredLotName": preferred_lot_name,
         "notes": payload.notes,
         "status": "pending",
         "serviceFee": 5,
