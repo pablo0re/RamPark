@@ -2,3 +2,5 @@
 .env.local
 .claude/
 node_modules/
+serviceAccountKey.json
+ram-park-backend/serviceAccountKey.json
